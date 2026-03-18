@@ -82,6 +82,25 @@ def audit_config(config):
     if not history_limit_found:
         issues.append({'id': 'NO_HISTORY_LIMIT', 'severity': 'WARNING', 'description': 'No maxMessages limit found for agent history. Vulnerable to context window poisoning.', 'recommendation': 'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).'})
 
+    
+    # 4. Tool Restrictions & Sandboxing (Network & Execution)
+    if "sandbox" in defaults:
+        if defaults["sandbox"].get("network") != "none":
+            issues.append({'id': 'SANDBOX_NETWORK_EGRESS', 'severity': 'WARNING', 'description': 'Agent sandbox network is not disabled. Agent could call external sites.', 'recommendation': 'Set agents.defaults.sandbox.network to "none".'})
+    
+    # 5. Limits & Timeouts
+    if not defaults.get("limits"):
+         issues.append({'id': 'NO_AGENT_LIMITS', 'severity': 'HIGH', 'description': 'No execution limits (timeouts, tool-call caps) defined for agents.', 'recommendation': 'Configure agents.defaults.limits with maxSteps, timeout, etc.'})
+
+    # 6. Approval Gates (Control UI)
+    if not gateway.get('approvalGates') and not config.get('approval_gates'):
+         issues.append({'id': 'NO_APPROVAL_GATES', 'severity': 'WARNING', 'description': 'Dangerous tools may run without human confirmation.', 'recommendation': 'Enable approval gates for tools like exec, shell, write_file.'})
+         
+    # 7. Output Filtering (Live Enforcement)
+    # Check if there's any active middleware/plugin for output filtering
+    if not config.get("plugins", {}).get("output_filter"):
+        issues.append({'id': 'NO_OUTPUT_FILTERING', 'severity': 'WARNING', 'description': 'No live output filtering configured to block secrets or prompt leaks.', 'recommendation': 'Install or enable an output filtering middleware/plugin.'})
+
     # END_CUSTOM_CONFIG_AUDITS
     
     return issues

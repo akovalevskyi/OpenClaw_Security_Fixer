@@ -102,6 +102,23 @@ def fix_config():
         changed = True
         print("✅ Added default Agent History Limit (maxMessages: 50)")
 
+    
+    # 3. Add Execution Limits & Timeouts
+    if "limits" not in config["agents"]["defaults"]:
+        config["agents"]["defaults"]["limits"] = {
+            "maxSteps": 30,
+            "timeoutMs": 120000
+        }
+        changed = True
+        print("✅ Added default Agent Execution Limits (maxSteps: 30, timeout: 2m)")
+        
+    # 4. Disable Sandbox Network Egress (if applicable)
+    if config["agents"]["defaults"].get("sandbox"):
+        if config["agents"]["defaults"]["sandbox"].get("network") != "none":
+            config["agents"]["defaults"]["sandbox"]["network"] = "none"
+            changed = True
+            print("✅ Disabled network egress in Agent Sandbox")
+
     # END_CUSTOM_CONFIG_FIXES
 
     if changed:

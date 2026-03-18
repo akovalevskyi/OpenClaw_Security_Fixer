@@ -135,3 +135,32 @@ Automatically applies hardening measures based on the audit findings:
 
 3. **Review the Host Checklist:**
    See `docs/openclaw_security_checklist.md` for manual VPS-level hardening steps.
+
+---
+
+## 🛡️ Non-Technical User Guidelines (How to not get hacked)
+
+Protecting your AI agent isn't just about running scripts; it's about how you set it up and use it daily. If you are not deeply technical, follow these **5 Golden Rules** to keep your agent (and your wallet) safe:
+
+### 1. Choose a "Hardened" AI Model (Prevent Prompt Injection)
+Not all AI models are created equal when it comes to resisting hacks (like "Prompt Injection," where attackers trick the AI into ignoring your rules). 
+*   **Recommendation:** Use established, highly secure, and tested models for your main agent, such as **Google Gemini 2.5/3.0+** or **OpenAI GPT-4o**.
+*   **Why?** These top-tier providers invest millions in "red-teaming" (testing their own models against attacks). Smaller, open-source, or unverified models are much easier to manipulate into giving up your secrets or ignoring safety instructions.
+
+### 2. Never Share Your Agent Publicly
+Your agent costs money (API tokens) and has access to your private workspace.
+*   **Recommendation:** In your OpenClaw settings, ensure your Telegram or Signal `dmPolicy` and `groupPolicy` are set to `allowlist`.
+*   **Why?** If set to `public`, anyone on the internet can chat with your bot, run up a massive API bill, or try to trick it into deleting your files. Only add your own personal User ID to the allowlist.
+
+### 3. Treat Your Prompt Like a Password
+The instructions you give your agent (your `SOUL.md` or System Prompt) often contain sensitive logic about how your business or personal systems work.
+*   **Recommendation:** Never instruct your AI to "share your system prompt" with users. Be wary of using third-party prompts without reading them.
+*   **Why?** Attackers use a technique called "System Prompt Extraction." If they know exactly how your AI is instructed, they can find loopholes to break it.
+
+### 4. Enforce the Digital Cage (Sandboxing)
+*   **Recommendation:** Always ensure the **Sandbox** is turned `on` and `workspaceOnly` is set to `true`. *(Note: Our automatic fixer script does this for you!)*
+*   **Why?** If the AI somehow goes rogue (or is tricked by an attacker), sandboxing acts as a digital cage. It prevents the AI from reaching out and deleting your server's core operating system files.
+
+### 5. Never Hardcode API Keys
+*   **Recommendation:** Never type your `sk-1234...` API keys directly into text files, your `openclaw.json`, or your prompt. Use environment variables or a secure secret manager (like our `vault.sh` integration).
+*   **Why?** If you accidentally share a screenshot, or if the AI accidentally quotes a file in a chat, your keys can be stolen and used by others within minutes, leading to thousands of dollars in charges.

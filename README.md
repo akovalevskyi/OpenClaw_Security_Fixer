@@ -1,68 +1,83 @@
-# OpenClaw Security Toolkit
+# OpenClaw Security Toolkit (Advanced)
 
-## Обзор и Архитектура
+## Overview & Architecture
 
-**OpenClaw Security Toolkit** — это комплексный набор скриптов и правил для проведения глубокого аудита безопасности и автоматического исправления уязвимостей в среде AI-агента OpenClaw. 
+**OpenClaw Security Toolkit** is a comprehensive suite of scripts and protocols designed for deep security auditing and automated hardening of the OpenClaw AI agent environment.
 
-**Важное замечание по среде тестирования:**
-Данные скрипты и чек-листы были разработаны, оптимизированы и протестированы преимущественно на **VPS (Virtual Private Server)** в среде Linux с использованием Docker-контейнеров. Они предполагают наличие стандартной структуры директорий OpenClaw (например, `/data/.openclaw/`), но могут быть адаптированы и для других сред.
+**Key Testing Environment:**
+This toolkit was primarily developed, optimized, and tested on **VPS (Virtual Private Server)** environments running Linux and Docker. It assumes a standard OpenClaw directory structure (e.g., `/data/.openclaw/`) but is adaptable to other Linux-based setups.
 
 ---
 
-## Дополнительные Сервисы Безопасности (Интеграция)
+## 🛡️ Core Security Infrastructure
 
-Наша архитектура безопасности выходит за рамки самого агента и опирается на три критически важных внешних сервиса:
+Our security architecture extends beyond the agent itself, integrating three critical external services to protect the host:
 
 1. **UFW (Uncomplicated Firewall):**
-   - **Для чего используется:** Жесткое ограничение сетевого доступа к серверу.
-   - **Важность:** Защищает от сканирования портов и несанкционированного доступа к внутренним сервисам (например, Docker или базам данных). Разрешены только строго необходимые порты (например, SSH на кастомном порту, порты для Telegram/Signal вебхуков, если они используются).
+   - **Purpose:** Restricts network access to the server at the OS level.
+   - **Importance:** Protects against port scanning and unauthorized access to internal services (Docker, DBs). Only essential ports (e.g., custom SSH port 2244) are exposed.
 
 2. **Fail2ban:**
-   - **Для чего используется:** Защита от брутфорс-атак.
-   - **Важность:** Автоматически блокирует IP-адреса злоумышленников, пытающихся подобрать пароли к SSH или другим сервисам, анализируя логи системы. Это первый эшелон защиты сервера от автоматизированных ботнетов.
+   - **Purpose:** Protects against brute-force attacks by monitoring system logs.
+   - **Importance:** Automatically bans IP addresses that show malicious behavior (e.g., multiple failed SSH logins), acting as the first line of defense against botnets.
 
-3. **Vault.sh (Защищенное хранилище секретов):**
-   - **Для чего используется:** Изоляция и шифрование чувствительных данных (API ключей, токенов).
-   - **Важность:** Вместо хранения ключей в открытом виде в конфигурационных файлах (которые могут быть случайно прочитаны агентом или утечь через логи), Vault шифрует их на уровне ОС. Доступ к ключам осуществляется только по интерактивному паролю через специальный скрипт-мост (`vault_bridge.py`), изолируя их от публичного мессенджера (например, Telegram).
-
----
-
-## Виды Проверок и их Критичность
-
-Скрипт `security_audit.py` проводит серию специализированных проверок. Каждая из них направлена на закрытие конкретного вектора атак.
-
-### 1. Конфигурация Шлюза (Gateway)
-- **`GW_INSECURE_AUTH` (Критично):** Проверяет, разрешена ли небезопасная аутентификация в Control UI. Если разрешена, любой в локальной сети может получить контроль над шлюзом.
-- **`GW_NO_DEVICE_AUTH` (Высокая):** Проверяет отключение авторизации устройств. Без неё злоумышленник может подключить несанкционированный интерфейс управления.
-
-### 2. Изоляция Агента и Песочница (Sandboxing)
-- **`SANDBOX_OFF` (Критично):** Проверяет, включена ли песочница для агентов (sandbox mode: "on"). Если песочница отключена, агент (или злоумышленник, манипулирующий промптами) может выполнить произвольный код на хосте (RCE - Remote Code Execution), уничтожить данные или захватить сервер.
-- **`FS_NOT_ISOLATED` (Высокая):** Проверяет параметр `workspaceOnly`. Без него агент может читать и писать файлы за пределами своей рабочей директории (например, системные файлы ОС).
-
-### 3. Защита Мессенджеров (Telegram/Signal)
-- **`DM_POLICY` / `GROUP_POLICY` (Критично):** Убеждается, что установлен режим `allowlist`. Если агент открыт для всех (public), любой пользователь интернета сможет взаимодействовать с ним, тратить ваши токены (деньги) или пытаться взломать систему через джейлбрейки промптов.
-- **`TELEGRAM_DENY_TOOLS` (Критично):** Проверяет наличие опасных инструментов (`exec`, `process`, `nodes`, `gateway`, `cron`) в списке запрещенных для Telegram. Telegram часто используется в общественных местах, и выполнение системных команд через него представляет огромный риск.
-
-### 4. Управление Секретами (Утечки)
-- **`HARDCODED_KEY` / `DATA_LEAK_IN_WORKSPACE` (Критично):** Скрипт рекурсивно ищет паттерны API ключей (OpenAI, Groq и др.) и паролей в логах, конфигурациях (`openclaw.json`) и рабочей директории (workspace). Хардкодинг ключей ведет к их краже при случайном коммите, бэкапе или если агент выдаст содержимое файла в чат. Рекомендация — перенос в `vault.sh`.
-
-### 5. Права Доступа к Файловой Системе (Permissions)
-- **`PERM_MISMATCH` / `DIR_PERM_MISMATCH` (Высокая/Предупреждение):** Проверяет, что файлы конфигураций (`openclaw.json`) и базы данных имеют строгие права (`600` или `700`). Некорректные права (например, `777`) позволяют любому процессу на сервере прочитать секреты агента.
-- **`RUNNING_AS_ROOT` (Высокая):** Если агент запущен от имени суперпользователя `root`, любая уязвимость в Node.js или самом агенте приведет к полному компрометированию всего сервера.
+3. **Vault.sh (Secure Secret Manager):**
+   - **Purpose:** Isolates and encrypts sensitive API keys and tokens using AES-256-CBC.
+   - **Importance:** Prevents secrets from being hardcoded in `openclaw.json` or leaked through logs. Secrets are only accessible via an interactive password-protected bridge (`vault_bridge.py`), isolating them from public messaging platforms like Telegram.
 
 ---
 
-## Использование
+## 🤖 Advanced AI & LLM Security Services
 
-### Аудит Системы
-Запустите скрипт аудита для получения отчета о текущем состоянии:
-```bash
-python3 scripts/security_audit.py
-```
+This toolkit integrates three industry-standard frameworks for auditing the **AI/LLM layer** itself. These tools automatically download and update large databases of security probes and jailbreak patterns:
 
-### Автоматическое Исправление
-Для автоматического применения безопасных настроек (исправление прав доступа, конфигурации и удаление утекших секретов) запустите фиксер:
-```bash
-python3 scripts/security_fixer.py
-```
-*Примечание: Фиксер может перезапустить шлюз OpenClaw, если были изменены конфигурации.*
+1. **Promptfoo (Prompt Evaluation & Compliance):**
+   - **What it does:** Runs automated evaluations of the agent's prompts to ensure they follow safety guidelines and do not leak system instructions.
+   - **Database:** Uses extensive sets of compliance and quality test cases.
+   - **Importance:** Ensures the agent doesn't "hallucinate" or bypass its core instructions (e.g., the "Rule of Dot").
+
+2. **Garak (LLM Vulnerability Scanner):**
+   - **What it does:** A specialized scanner for LLMs (similar to Nmap for networks). It probes for prompt injections, hallucination risks, and data leakage.
+   - **Database:** Downloads hundreds of probes specifically designed to break LLM safety filters.
+   - **Importance:** Identifies if the chosen model (e.g., GPT-4o-mini, Claude-3.5-Sonnet) is inherently vulnerable to specific attack vectors in your current configuration.
+
+3. **PyRIT (Python Risk Identification Tool):**
+   - **What it does:** A red-teaming framework by Microsoft for multi-turn adversarial attacks.
+   - **Database:** Utilizes sophisticated strategies like "Crescendo" to bypass AI safety guardrails through gradual persuasion.
+   - **Importance:** Simulates a real human attacker trying to manipulate the AI over a long conversation, allowing us to find and patch deep logical vulnerabilities.
+
+---
+
+## 🔍 Audit & Fixer Modules (Python)
+
+### `security_audit.py` (The Scanner)
+Performs a recursive audit of the entire system:
+- **Gateway Config:** Checks for `GW_INSECURE_AUTH` and `GW_NO_DEVICE_AUTH`.
+- **Sandboxing:** Validates if `sandbox: on` and `workspaceOnly: true` are enforced (Critical to prevent RCE).
+- **Messaging Security:** Ensures `dmPolicy: allowlist` is active to prevent public token abuse.
+- **Data Leaks:** Scans all workspaces and configs for hardcoded API keys.
+- **Permissions:** Validates Linux file permissions (ensures `600`/`700` on sensitive files).
+
+### `security_fixer.py` (The Repairman)
+Automatically applies hardening measures based on the audit findings:
+- Resets dangerous configuration flags to secure defaults.
+- Automatically `chmod` files and directories to recommended modes.
+- Redacts/masks plaintext secrets found in workspaces.
+- *Note: May trigger a Gateway restart to apply changes.*
+
+---
+
+## Getting Started
+
+1. **Run a full system audit:**
+   ```bash
+   python3 scripts/security_audit.py
+   ```
+
+2. **Apply automated security fixes:**
+   ```bash
+   python3 scripts/security_fixer.py
+   ```
+
+3. **Review the Host Checklist:**
+   See `docs/openclaw_security_checklist.md` for manual VPS-level hardening steps.

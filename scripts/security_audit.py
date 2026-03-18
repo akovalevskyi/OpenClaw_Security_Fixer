@@ -149,6 +149,60 @@ def audit_config(config):
     if not config.get("plugins", {}).get("output_filter"):
         issues.append(make_issue('NO_OUTPUT_FILTERING', 'WARNING', 'No live output filtering configured to block secrets or prompt leaks.', 'Install or enable an output filtering middleware/plugin.', category='data_security'))
 
+    # 8. System Prompt Presence
+    for agent in config.get("agents", {}).get("list", []):
+        if not agent.get("systemPrompt") and not defaults.get("systemPrompt"):
+            issues.append(make_issue(f'NO_SYSTEM_PROMPT_{agent.get("id", "unknown").upper()}', 'HIGH', f'Agent {agent.get("id")} has no systemPrompt configured.', 'Configure a robust systemPrompt with defensive instructions.', category='prompt_security'))
+
+    return issues
+
+def audit_output_sanitization(config):
+    issues = []
+    output_filter = config.get("plugins", {}).get("output_filter", {})
+    if not output_filter:
+        return issues
+    
+    patterns = output_filter.get("patterns", [])
+    if not patterns:
+        issues.append(make_issue('OUTPUT_FILTER_NO_PATTERNS', 'HIGH', 'Output filter is enabled but has no redaction patterns.', 'Configure patterns for secrets (sk-, ghp_) and PII in output_filter plugin.', category='data_security', auto_fixable=True))
+    else:
+        essential_patterns = ["sk-", "ghp_", "password"]
+        configured_patterns = str(patterns).lower()
+        for p in essential_patterns:
+            if p not in configured_patterns:
+                issues.append(make_issue(f'OUTPUT_FILTER_MISSING_{p.upper()}', 'WARNING', f'Output filter is missing pattern for: {p}', f'Add a regex pattern to block {p} in the output_filter configuration.', category='data_security', auto_fixable=True))
+    return issues
+
+def audit_indirect_injection_vectors(config):
+    issues = []
+    defaults = config.get("agents", {}).get("defaults", {})
+    untrusted_data_tools = ["web_search", "fetch", "read_url", "gmail.read"]
+    approval_gates = str(config.get("approval_gates", []) or config.get("gateway", {}).get("approvalGates", []))
+    
+    for tool in untrusted_data_tools:
+        is_denied_globally = tool in defaults.get("tools", {}).get("deny", [])
+        if not is_denied_globally:
+            if tool not in approval_gates:
+                issues.append(make_issue(
+                    f'INDIRECT_INJECTION_RISK_{tool.upper()}',
+                    'HIGH',
+                    f'Tool "{tool}" is enabled without human approval (HITL).',
+                    f'Enable an approval_gate for "{tool}" to prevent indirect prompt injection from untrusted external data.',
+                    category='prompt_security'
+                ))
+    return issues
+
+def audit_monitoring_status(config):
+    issues = []
+    if not config.get("logging") and not config.get("logs"):
+        issues.append(make_issue(
+            'LOGGING_DISABLED',
+            'WARNING',
+            'System logging is disabled or not configured.',
+            'Enable logging in openclaw.json for security auditing and forensics.',
+            category='monitoring',
+            auto_fixable=True
+        ))
     return issues
 
 def audit_prompt_defense_markers():
@@ -503,7 +557,7 @@ def main():
     use_json = '--json' in sys.argv
     
     if not use_json:
-        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT ---{RESET}')
+        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT v1.5 ---{RESET}')
     
     all_issues = []
     if os.path.exists(DEFAULT_CONFIG_PATH):
@@ -511,9 +565,11 @@ def main():
             with open(DEFAULT_CONFIG_PATH, 'r') as f:
                 config = json.load(f)
             all_issues += audit_config(config)
+            all_issues += audit_output_sanitization(config)
+            all_issues += audit_indirect_injection_vectors(config)
+            all_issues += audit_monitoring_status(config)
         except Exception as e:
-            if not use_json: print(f"{RED}Error loading config: {e}{RESET}")
-    
+            if not use_json: print(f"{RED}Error loading config: {e}{RESET}")    
     all_issues += audit_permissions()
     all_issues += audit_workspace_leaks()
     all_issues += audit_prompt_defense_markers()

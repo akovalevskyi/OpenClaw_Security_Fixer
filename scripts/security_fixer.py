@@ -188,6 +188,41 @@ def fix_config():
                 changed = True
                 print(f"✅ {'Would set' if DRY_RUN else 'Set'} agents.defaults.limits.{key} to {SELECTED_PROFILE[key]}")
 
+    # 7. Output Filtering (v1.5)
+    if "plugins" not in config: config["plugins"] = {}
+    if "output_filter" not in config["plugins"]:
+        if confirm("Enable output_filter plugin with default patterns?"):
+            config["plugins"]["output_filter"] = {
+                "enabled": True,
+                "patterns": [
+                    { "regex": "sk-[a-zA-Z0-9]{20,}", "replacement": "[SECRET REDACTED]" },
+                    { "regex": "ghp_[a-zA-Z0-9]{20,}", "replacement": "[TOKEN REDACTED]" },
+                    { "regex": "gsk_[a-zA-Z0-9]{20,}", "replacement": "[SECRET REDACTED]" },
+                    { "regex": "eyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9._-]{10,}\\.[A-Za-z0-9._-]{10,}", "replacement": "[JWT REDACTED]" }
+                ]
+            }
+            changed = True
+            print(f"✅ {'Would add' if DRY_RUN else 'Added'} default output_filter configuration")
+
+    # 8. Logging (v1.5)
+    if not config.get("logging") and not config.get("logs"):
+        if confirm("Enable system logging?"):
+            config["logging"] = { "level": "info", "file": "openclaw.log" }
+            changed = True
+            print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} system logging")
+
+    # 9. Approval Gates for Data Ingestion (v1.5)
+    untrusted_tools = ["web_search", "fetch", "read_url"]
+    if PROFILE_NAME in ["recommended", "paranoid"]:
+        if "approval_gates" not in config: config["approval_gates"] = []
+        for tool in untrusted_tools:
+            if tool not in str(config.get("approval_gates")):
+                if confirm(f"Add approval_gate for tool '{tool}'?"):
+                    if isinstance(config["approval_gates"], list):
+                        config["approval_gates"].append(tool)
+                        changed = True
+                        print(f"✅ {'Would add' if DRY_RUN else 'Added'} approval_gate for {tool}")
+
     if changed:
         backup_file(DEFAULT_CONFIG_PATH)
         atomic_write_json(DEFAULT_CONFIG_PATH, config)
@@ -260,7 +295,7 @@ def restart_service():
     print("⚠️ No restart strategy configured. Manual restart may be required.")
 
 def main():
-    print(f"--- OPENCLAW SECURITY FIXER v1.4 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
+    print(f"--- OPENCLAW SECURITY FIXER v1.5 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
     fix_workspace_leaks()

@@ -18,7 +18,7 @@
 
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
 [![Environment: Linux/Docker](https://img.shields.io/badge/Environment-Linux_Docker-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![Version: 1.4](https://img.shields.io/badge/Version-1.4_Hardened-orange?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
+[![Version: 1.5](https://img.shields.io/badge/Version-1.5_Hardened-orange?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 </div>
@@ -28,9 +28,12 @@
 
 ---
 
-## ✅ Implemented in the Current Version (v1.4)
+## ✅ Implemented in the Current Version (v1.5)
 
-*   **Reliable Host Audit:** Evaluates effective SSH configuration using `sshd -T` (not just simple grep).
+*   **Output Sanitization (Scrubbing):** Automatically detects and can configure output filters to block PII and secret leaks.
+*   **Indirect Prompt Injection Protection:** Audits data-ingesting tools and enforces Human-in-the-Loop (HITL) approval gates.
+*   **Monitoring & Auditing:** Checks for system logging status and can enable it for forensic trail.
+*   **Reliable Host Audit:** Evaluates effective SSH configuration using `sshd -T`.
 *   **Dynamic Container Discovery:** Automatically detects OpenClaw/Gateway containers and inspects their runtime environment.
 *   **Safe Hardening (Atomic Writes):** All configuration changes are written atomically via temp files to prevent corruption.
 *   **Automatic Backups:** Creates timestamped `.bak` files before any modification.

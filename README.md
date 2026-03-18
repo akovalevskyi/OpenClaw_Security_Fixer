@@ -17,10 +17,35 @@
 **The Unyielding Guardian of Your AI Agent**
 
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/termuxtest)
-[![Environment: VPS](https://img.shields.io/badge/Environment-VPS-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/termuxtest)
+[![Environment: Hostinger VPS](https://img.shields.io/badge/Environment-Hostinger_VPS-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/termuxtest)
 [![Agent: OpenClaw](https://img.shields.io/badge/Agent-OpenClaw-orange?style=for-the-badge)](https://github.com/akovalevskyi/termuxtest)
 
 </div>
+
+> [!IMPORTANT]
+> **Note on Compatibility:** This toolkit was developed and rigorously tested on **Hostinger VPS** infrastructure. While settings may vary slightly depending on your provider's specific OS image or kernel configuration, it is designed to be compatible with **99% of standard Linux VPS environments** (Ubuntu/Debian/CentOS) using Docker.
+
+---
+
+## 🚀 Quick Start (OpenClaw Integration)
+
+To use this toolkit as a skill within your OpenClaw environment:
+
+1. **Clone to your Skills directory:**
+   Navigate to your OpenClaw skills folder on the VPS and run:
+   ```bash
+   git clone https://github.com/akovalevskyi/termuxtest.git security-toolkit
+   ```
+
+2. **Register the Skill:**
+   Add the path to this folder in your `openclaw.json` under the `skills` section, or simply point your agent to this directory.
+
+3. **Run via Agent:**
+   You can now ask your OpenClaw agent:
+   - *"Run a security audit using the security toolkit"*
+   - *"Apply security fixes to my VPS"*
+
+---
 
 ## Overview & Architecture
 

@@ -5,6 +5,17 @@ import sys
 import subprocess
 import re
 
+try:
+    from colorama import init, Fore, Style
+    init(autoreset=True)
+    RED = Fore.RED + Style.BRIGHT
+    GREEN = Fore.GREEN + Style.BRIGHT
+    YELLOW = Fore.YELLOW + Style.BRIGHT
+    CYAN = Fore.CYAN + Style.BRIGHT
+    RESET = Style.RESET_ALL
+except ImportError:
+    RED = GREEN = YELLOW = CYAN = RESET = ""
+
 def audit_config(config):
     issues = []
     gateway = config.get('gateway', {})
@@ -124,7 +135,7 @@ def audit_workspace_leaks():
     return issues
 
 def main():
-    print('--- OPENCLAW SECURITY AUDIT ---')
+    print(f'{CYAN}--- OPENCLAW SECURITY AUDIT ---{RESET}')
     config_path = '/data/.openclaw/openclaw.json'
     
     all_issues = []
@@ -137,11 +148,12 @@ def main():
     all_issues += audit_workspace_leaks()
     
     if not all_issues:
-        print('✅ No security issues found. System is hardened.')
+        print(f'{GREEN}✅ No security issues found. System is hardened.{RESET}')
     else:
-        print(f'⚠️ Found {len(all_issues)} issues:\n')
+        print(f'{YELLOW}⚠️ Found {len(all_issues)} issues:\n{RESET}')
         for issue in all_issues:
-            print(f"[{issue['severity']}] {issue['id']}\nDescription: {issue['description']}\nRecommendation: {issue['recommendation']}\n")
+            sev_color = RED if issue['severity'] == 'CRITICAL' else YELLOW
+            print(f"[{sev_color}{issue['severity']}{RESET}] {issue['id']}\nDescription: {issue['description']}\nRecommendation: {issue['recommendation']}\n")
 
 if __name__ == '__main__':
     main()

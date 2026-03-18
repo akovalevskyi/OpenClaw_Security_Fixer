@@ -35,13 +35,20 @@ To use this toolkit as a skill within your OpenClaw environment:
    Navigate to your OpenClaw skills folder on the VPS and run:
    ```bash
    git clone https://github.com/akovalevskyi/termuxtest.git security-toolkit
+   cd security-toolkit
+   pip install -r requirements.txt
    ```
 
-2. **Register the Skill:**
-   Add the path to this folder in your `openclaw.json` under the `skills` section, or simply point your agent to this directory.
+2. **Interactive Menu (Recommended for Humans):**
+   We have included a beautiful, color-coded interactive wrapper for easy use via SSH. Just run:
+   ```bash
+   ./openclaw-secure.sh
+   ```
+   
+   ![Interactive Menu Demo](https://img.shields.io/badge/Terminal-Interactive_Menu-black?style=flat-square&logo=gnu-bash)
 
 3. **Run via Agent:**
-   You can now ask your OpenClaw agent:
+   Register the path to this folder in your `openclaw.json` under the `skills` section. You can now ask your OpenClaw agent:
    - *"Run a security audit using the security toolkit"*
    - *"Apply security fixes to my VPS"*
 

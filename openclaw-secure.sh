@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# OpenClaw Security Toolkit - Interactive Menu
+# OpenClaw Security Toolkit v1.1 - Interactive Menu
 
 # Colors and formatting
 GREEN='\033[0;32m'
@@ -28,22 +28,23 @@ echo "       / /          \ \    "
 echo "      \"-\"            \"-\"   "
 echo -e "${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
-echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - The Guardian     ${NC}"
+echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - v1.1 Hardened    ${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
 echo ""
 
 show_menu() {
     echo -e "Please select an operation to perform:"
     echo -e "  ${GREEN}[1]${NC} 🔍 Run Full Security Audit (Safe)"
-    echo -e "  ${YELLOW}[2]${NC} 🛠️  Apply Automated Fixes (Modifies config)"
-    echo -e "  ${CYAN}[3]${NC} 📋 View Manual Host Checklist"
+    echo -e "  ${YELLOW}[2]${NC} 🛡️  Fixer: Dry-Run (See what would change)"
+    echo -e "  ${RED}[3]${NC} 🛠️  Fixer: Apply Changes (With auto-backup)"
+    echo -e "  ${CYAN}[4]${NC} 📋 View Host Checklist & Backups"
     echo -e "  ${RED}[q]${NC} 🚪 Quit"
     echo ""
 }
 
 while true; do
     show_menu
-    read -p "Select option [1-3, q]: " choice
+    read -p "Select option [1-4, q]: " choice
     echo ""
     
     case $choice in
@@ -53,21 +54,28 @@ while true; do
             echo -e "\n${GREEN}<<< Audit Complete.${NC}\n"
             ;;
         2)
-            echo -e "${YELLOW}>>> Starting Automated Fixer...${NC}"
-            echo -e "${RED}WARNING: This may modify your openclaw.json and restart the gateway.${NC}"
-            read -p "Are you sure you want to proceed? (y/N): " confirm
+            echo -e "${YELLOW}>>> Running Fixer in DRY-RUN mode...${NC}\n"
+            python3 "$DIR/scripts/security_fixer.py" --dry-run
+            echo -e "\n${YELLOW}<<< Dry-Run Complete. No files were modified.${NC}\n"
+            ;;
+        3)
+            echo -e "${RED}>>> Starting Automated Fixer (LIVE)...${NC}"
+            echo -e "${RED}WARNING: This will modify configs and potentially restart the gateway.${NC}"
+            read -p "A backup will be created. Proceed? (y/N): " confirm
             if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 echo ""
                 python3 "$DIR/scripts/security_fixer.py"
             else
                 echo -e "Operation cancelled.\n"
             fi
-            echo -e "\n${YELLOW}<<< Fixer Complete.${NC}\n"
+            echo -e "\n${RED}<<< Fixer Complete.${NC}\n"
             ;;
-        3)
+        4)
             echo -e "${CYAN}>>> Host Security Checklist${NC}\n"
             cat "$DIR/docs/openclaw_security_checklist.md"
-            echo -e "\n${CYAN}<<< End of Checklist.${NC}\n"
+            echo -e "\n${CYAN}>>> Recent Config Backups:${NC}"
+            ls -lt /data/.openclaw/*.bak 2>/dev/null | head -n 5
+            echo -e "\n${CYAN}<<< End of Info.${NC}\n"
             ;;
         q|Q)
             echo -e "Stay secure! 🦀🛡️ Goodbye."

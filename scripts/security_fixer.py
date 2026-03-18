@@ -4,20 +4,43 @@ import os
 import sys
 import subprocess
 import re
+from datetime import datetime
+import shutil
+
+# Global flag for dry-run
+DRY_RUN = "--dry-run" in sys.argv
+
+def backup_config(path):
+    if DRY_RUN: return
+    if os.path.exists(path):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{path}.{timestamp}.bak"
+        shutil.copy2(path, backup_path)
+        print(f"[Backup] Created backup at {backup_path}")
+
+def atomic_write_json(path, data):
+    if DRY_RUN:
+        print(f"[Dry-Run] Would write updated config to {path}")
+        return
+    temp_path = f"{path}.tmp"
+    with open(temp_path, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_path, path)
 
 def fix_permissions():
-    print("[Fixer] Hardening file permissions...")
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Hardening file permissions...")
     paths_to_fix = [('/data/.openclaw/openclaw.json', '600'), ('/data/.openclaw/credentials', '700'), ('/data', '700'), ('/data/.openclaw', '700'), ('/data/.signal-data', '700')]
     for path, mode in paths_to_fix:
         if os.path.exists(path):
             try:
-                subprocess.run(["chmod", mode, path], check=True)
-                print(f"✅ Set {mode} for {path}")
+                if not DRY_RUN:
+                    subprocess.run(["chmod", mode, path], check=True)
+                print(f"✅ {'Would set' if DRY_RUN else 'Set'} {mode} for {path}")
             except Exception as e:
                 print(f"❌ Failed to fix {path}: {e}")
 
 def fix_config():
-    print("[Fixer] Hardening openclaw.json configuration...")
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Hardening openclaw.json configuration...")
     config_path = "/data/.openclaw/openclaw.json"
     if not os.path.exists(config_path):
         print("❌ Config file not found.")
@@ -28,7 +51,7 @@ def fix_config():
 
     changed = False
     
-    # Standard Hardening
+    # 1. Gateway Hardening
     if "gateway" not in config: config["gateway"] = {}
     if "controlUi" not in config["gateway"]: config["gateway"]["controlUi"] = {}
     
@@ -36,100 +59,68 @@ def fix_config():
         if config["gateway"]["controlUi"].get(key) is not False:
             config["gateway"]["controlUi"][key] = False
             changed = True
-            print(f"✅ Set {key} to False")
+            print(f"✅ {'Would set' if DRY_RUN else 'Set'} {key} to False")
 
+    # 2. Filesystem Isolation
     if "tools" not in config: config["tools"] = {}
     if "fs" not in config["tools"]: config["tools"]["fs"] = {}
     if config["tools"]["fs"].get("workspaceOnly") is not True:
         config["tools"]["fs"]["workspaceOnly"] = True
         changed = True
-        print("✅ Enabled filesystem workspaceOnly")
+        print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} filesystem workspaceOnly")
 
-    # START_CUSTOM_CONFIG_FIXES
+    # 3. Agent Sandboxing
     if "agents" not in config: config["agents"] = {}
     if "defaults" not in config["agents"]: config["agents"]["defaults"] = {}
     if "sandbox" not in config["agents"]["defaults"]: config["agents"]["defaults"]["sandbox"] = {}
     if config["agents"]["defaults"]["sandbox"].get("mode") != "on":
         config["agents"]["defaults"]["sandbox"]["mode"] = "on"
         changed = True
-        print("✅ Enabled agent sandboxing (mode: on)")
-    # Fix for allowlist policy in channels
+        print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} agent sandboxing (mode: on)")
+
+    # 4. Channel Policies (Allowlist)
     if "channels" not in config: config["channels"] = {}
     for channel_name in ['telegram', 'signal']:
         if channel_name not in config["channels"]: config["channels"][channel_name] = {}
-        if config["channels"][channel_name].get('dmPolicy') != 'allowlist':
-            config["channels"][channel_name]['dmPolicy'] = 'allowlist'
-            changed = True
-            print(f"✅ Set channels.{channel_name}.dmPolicy to allowlist")
-        if config["channels"][channel_name].get('groupPolicy') != 'allowlist':
-            config["channels"][channel_name]['groupPolicy'] = 'allowlist'
-            changed = True
-            print(f"✅ Set channels.{channel_name}.groupPolicy to allowlist")
+        for policy in ['dmPolicy', 'groupPolicy']:
+            if config["channels"][channel_name].get(policy) != 'allowlist':
+                config["channels"][channel_name][policy] = 'allowlist'
+                changed = True
+                print(f"✅ {'Would set' if DRY_RUN else 'Set'} channels.{channel_name}.{policy} to allowlist")
 
-    # Fix for dangerous tools in telegram bot tools.deny
+    # 5. Telegram Dangerous Tools
     if "telegramBot" not in config: config["telegramBot"] = {}
     if "tools" not in config["telegramBot"]: config["telegramBot"]["tools"] = {}
     if "deny" not in config["telegramBot"]["tools"]: config["telegramBot"]["tools"]["deny"] = []
     
-    dangerous_tools = ["exec", "process", "nodes", "gateway", "cron"]
+    dangerous_tools = ["exec", "process", "nodes", "gateway", "cron", "bash", "shell"]
     for tool in dangerous_tools:
         if tool not in config["telegramBot"]["tools"]["deny"]:
             config["telegramBot"]["tools"]["deny"].append(tool)
             changed = True
-            print(f"✅ Added \"{tool}\" to telegramBot.tools.deny")
+            print(f"✅ {'Would add' if DRY_RUN else 'Added'} \"{tool}\" to telegramBot.tools.deny")
 
-    # ADVANCED AI SECURITY FIXES
-    # 1. Add Default Rate Limiting if none exists
-    if "gateway" not in config: config["gateway"] = {}
-    if not config["gateway"].get("rateLimit"):
-        config["gateway"]["rateLimit"] = {"max": 100, "timeWindow": 60000}
-        changed = True
-        print("✅ Added default Gateway Rate Limit (100 req/min)")
-        
-    # 2. Add History Boundary (Context Window limit)
-    if "agents" not in config: config["agents"] = {}
-    if "defaults" not in config["agents"]: config["agents"]["defaults"] = {}
+    # 6. Default Limits & History
     if "history" not in config["agents"]["defaults"]: config["agents"]["defaults"]["history"] = {}
-    
-    # Check if a limit already exists in defaults or any agent
-    limit_exists = False
-    if config["agents"]["defaults"]["history"].get("maxMessages"): limit_exists = True
-    for a in config.get("agents", {}).get("list", []):
-        if a.get("history", {}).get("maxMessages"): limit_exists = True
-        
-    if not limit_exists:
+    if not config["agents"]["defaults"]["history"].get("maxMessages"):
         config["agents"]["defaults"]["history"]["maxMessages"] = 50
         changed = True
-        print("✅ Added default Agent History Limit (maxMessages: 50)")
+        print(f"✅ {'Would add' if DRY_RUN else 'Added'} default History Limit (maxMessages: 50)")
 
-    
-    # 3. Add Execution Limits & Timeouts
     if "limits" not in config["agents"]["defaults"]:
-        config["agents"]["defaults"]["limits"] = {
-            "maxSteps": 30,
-            "timeoutMs": 120000
-        }
+        config["agents"]["defaults"]["limits"] = {"maxSteps": 30, "timeoutMs": 120000}
         changed = True
-        print("✅ Added default Agent Execution Limits (maxSteps: 30, timeout: 2m)")
-        
-    # 4. Disable Sandbox Network Egress (if applicable)
-    if config["agents"]["defaults"].get("sandbox"):
-        if config["agents"]["defaults"]["sandbox"].get("network") != "none":
-            config["agents"]["defaults"]["sandbox"]["network"] = "none"
-            changed = True
-            print("✅ Disabled network egress in Agent Sandbox")
-
-    # END_CUSTOM_CONFIG_FIXES
+        print(f"✅ {'Would add' if DRY_RUN else 'Added'} default Agent Execution Limits")
 
     if changed:
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=2)
-        print("✅ Configuration updated.")
+        backup_config(config_path)
+        atomic_write_json(config_path, config)
+        print(f"✅ Configuration {'checked (no changes)' if DRY_RUN else 'updated'}.")
         return True
     return False
 
 def fix_workspace_leaks():
-    print("[Fixer] Scanning and redacting secrets in workspaces...")
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Scanning and redacting secrets in workspaces...")
     patterns = [
         (re.compile(r'sk-[a-zA-Z0-9]{30,}'), 'sk-****'),
         (re.compile(r'gsk_[a-zA-Z0-9]{30,}'), 'gsk_****'),
@@ -153,28 +144,26 @@ def fix_workspace_leaks():
                             new_content = pattern.sub(replacement, new_content)
                         
                         if new_content != content:
-                            with open(f_path, 'w') as f:
-                                f.write(new_content)
-                            print(f"✅ Redacted secrets in {f_path}")
+                            if not DRY_RUN:
+                                with open(f_path, 'w') as f:
+                                    f.write(new_content)
+                            print(f"✅ {'Would redact' if DRY_RUN else 'Redacted'} secrets in {f_path}")
                     except: pass
 
 def main():
-    print("--- OPENCLAW SECURITY FIXER ---")
+    print(f"--- OPENCLAW SECURITY FIXER v1.1 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
     fix_workspace_leaks()
     
-    # START_CUSTOM_SYSTEM_FIXES
-    # END_CUSTOM_SYSTEM_FIXES
-
-    if config_changed:
-        print("\n⚠️ Restarting Gateway...")
+    if config_changed and not DRY_RUN:
+        print("\n⚠️ Restarting Gateway via docker (if available)...")
+        # Attempt common restart methods
         try:
-            # We assume node server.mjs is the entry point
-            subprocess.run(["node", "server.mjs", "gateway", "restart"], check=False)
-            print("✅ Restart command sent.")
+            subprocess.run(["docker", "restart", "openclaw-3g02-openclaw-1"], check=False)
+            print("✅ Docker restart command sent.")
         except:
-            print("❌ Manual restart required.")
+            print("❌ Manual restart required: 'openclaw gateway restart'")
 
 if __name__ == "__main__":
     main()

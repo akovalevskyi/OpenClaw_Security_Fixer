@@ -60,12 +60,18 @@ def audit_config(config):
             if channel_data.get('groupPolicy') != 'allowlist':
                 issues.append({'id': f'{channel_name.upper()}_GROUP_POLICY', 'severity': 'CRITICAL', 'description': f'{channel_name} groupPolicy is not allowlist.', 'recommendation': f'Set channels.{channel_name}.groupPolicy to "allowlist".'})
 
-    # Check for dangerous tools in telegram bot tools.deny
+    # Check for dangerous tools in telegram bot
     telegram_bot = config.get('telegramBot', {})
-    if 'tools' in telegram_bot and 'deny' in telegram_bot['tools']:
-        dangerous_tools = ["exec", "process", "nodes", "gateway", "cron"]
+    tb_tools = telegram_bot.get('tools', {})
+    tb_deny = tb_tools.get('deny', [])
+    
+    dangerous_tools = ["exec", "process", "nodes", "gateway", "cron", "bash", "shell"]
+    
+    if not tb_tools or not tb_deny:
+        issues.append({'id': 'TELEGRAM_NO_DENYLIST', 'severity': 'CRITICAL', 'description': 'Telegram bot has no tools.deny section. All tools might be allowed.', 'recommendation': 'Add a tools.deny section to telegramBot.'})
+    else:
         for tool in dangerous_tools:
-            if tool not in telegram_bot['tools']['deny']:
+            if tool not in tb_deny:
                 issues.append({'id': f'TELEGRAM_DENY_{tool.upper()}', 'severity': 'CRITICAL', 'description': f'Telegram bot does not deny dangerous tool: {tool}.', 'recommendation': f'Add "{tool}" to telegramBot.tools.deny.'})
     
     # ADVANCED AI SECURITY CHECKS
@@ -73,15 +79,24 @@ def audit_config(config):
     if not telegram_bot.get('budgets') and not config.get('gateway', {}).get('rateLimit'):
          issues.append({'id': 'NO_RATE_LIMITS', 'severity': 'HIGH', 'description': 'No budgets or rate limits configured. Vulnerable to financial DoS.', 'recommendation': 'Configure telegramBot.budgets or gateway rate limits.'})
 
-    # 2. Context Window Poisoning
-    history_limit_found = False
-    for agent in config.get('agents', {}).get('list', []):
-        if agent.get('history', {}).get('maxMessages') or config.get('agents', {}).get('defaults', {}).get('history', {}).get('maxMessages'):
-            history_limit_found = True
-            break
-    if not history_limit_found:
-        issues.append({'id': 'NO_HISTORY_LIMIT', 'severity': 'WARNING', 'description': 'No maxMessages limit found for agent history. Vulnerable to context window poisoning.', 'recommendation': 'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).'})
+    # 2. Context Window Poisoning (Fixed logic)
+    history_limit = config.get('agents', {}).get('defaults', {}).get('history', {}).get('maxMessages')
+    if not history_limit:
+        history_limit_found = False
+        for agent in config.get('agents', {}).get('list', []):
+            if agent.get('history', {}).get('maxMessages'):
+                history_limit_found = True
+                break
+        if not history_limit_found:
+            issues.append({'id': 'NO_HISTORY_LIMIT', 'severity': 'WARNING', 'description': 'No maxMessages limit found for agent history. Vulnerable to context window poisoning.', 'recommendation': 'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).'})
 
+    # 3. Container Hardening Checks
+    try:
+        if os.getuid() == 0:
+            issues.append({'id': 'RUNNING_AS_ROOT', 'severity': 'HIGH', 'description': 'Process is running as root.', 'recommendation': 'Run as a non-privileged user.'})
+        if os.path.exists('/var/run/docker.sock'):
+            issues.append({'id': 'DOCKER_SOCK_MOUNTED', 'severity': 'CRITICAL', 'description': 'Docker socket is mounted inside the container.', 'recommendation': 'Unmount /var/run/docker.sock to prevent container escape.'})
+    except: pass
     
     # 4. Tool Restrictions & Sandboxing (Network & Execution)
     if "sandbox" in defaults:
@@ -166,10 +181,13 @@ def audit_permissions():
 
 def audit_workspace_leaks():
     issues = []
-    # Patterns for common secrets: OpenAI, Groq, OpenRouter, generic passwords
+    # Expanded patterns for common secrets: OpenAI, Groq, OpenRouter, AWS, JWT, PEM, passwords
     patterns = [
         (re.compile(r'sk-[a-zA-Z0-9]{30,}'), 'OpenAI/OpenRouter API Key'),
         (re.compile(r'gsk_[a-zA-Z0-9]{30,}'), 'Groq API Key'),
+        (re.compile(r'(?:[A-Z0-9]{20})'), 'Potential AWS Access Key'),
+        (re.compile(r'-----BEGIN (?:RSA )?PRIVATE KEY-----'), 'Private Key (PEM)'),
+        (re.compile(r'ey[a-zA-Z0-9]{10,}\.ey[a-zA-Z0-9]{10,}\.[a-zA-Z0-9_-]{10,}'), 'JWT Token'),
         (re.compile(r'PASSWORD:\s*\S+'), 'Plaintext Password'),
     ]
     

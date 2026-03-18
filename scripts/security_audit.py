@@ -179,6 +179,14 @@ def audit_permissions():
     
     return issues
 
+import math
+
+def calculate_entropy(s):
+    if not s: return 0
+    probabilities = [float(s.count(c)) / len(s) for c in dict.fromkeys(list(s))]
+    entropy = - sum([p * math.log(p) / math.log(2.0) for p in probabilities])
+    return entropy
+
 def audit_workspace_leaks():
     issues = []
     # Expanded patterns for common secrets: OpenAI, Groq, OpenRouter, AWS, JWT, PEM, passwords
@@ -201,32 +209,57 @@ def audit_workspace_leaks():
                     f_path = os.path.join(base, f_name)
                     try:
                         with open(f_path, 'r', errors='ignore') as f:
-                            content = f.read()
-                            for pattern, desc in patterns:
-                                if pattern.search(content):
-                                    issues.append({
-                                        'id': 'DATA_LEAK_IN_WORKSPACE',
-                                        'severity': 'CRITICAL',
-                                        'description': f'Potential {desc} found in {f_path}',
-                                        'recommendation': f'Redact secrets in {f_path} and move to vault.sh.'
-                                    })
+                            for line_num, line in enumerate(f, 1):
+                                # 1. Regex checks
+                                for pattern, desc in patterns:
+                                    if pattern.search(line):
+                                        issues.append({
+                                            'id': 'DATA_LEAK_IN_WORKSPACE',
+                                            'severity': 'CRITICAL',
+                                            'description': f'Potential {desc} found in {f_path} (line {line_num})',
+                                            'recommendation': f'Redact secrets in {f_path} and move to vault.sh.'
+                                        })
+                                # 2. Entropy check for unknown high-entropy strings (e.g. random keys)
+                                for word in line.split():
+                                    if len(word) > 32 and calculate_entropy(word) > 4.5:
+                                        issues.append({
+                                            'id': 'HIGH_ENTROPY_STRING',
+                                            'severity': 'WARNING',
+                                            'description': f'Unknown high-entropy string (possible key) in {f_path} (line {line_num})',
+                                            'recommendation': 'Verify if this string is a secret and redact if necessary.'
+                                        })
                     except: pass
     return issues
 
 def main():
-    print(f'{CYAN}--- OPENCLAW SECURITY AUDIT ---{RESET}')
-    config_path = '/data/.openclaw/openclaw.json'
+    use_json = '--json' in sys.argv
+    
+    if not use_json:
+        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT ---{RESET}')
+    
+    config_path = os.getenv('OPENCLAW_CONFIG', '/data/.openclaw/openclaw.json')
     
     all_issues = []
     if os.path.exists(config_path):
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        all_issues += audit_config(config)
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            all_issues += audit_config(config)
+        except Exception as e:
+            if not use_json: print(f"{RED}Error loading config: {e}{RESET}")
     
     all_issues += audit_permissions()
     all_issues += audit_workspace_leaks()
     all_issues += audit_prompt_integrity()
     
+    if use_json:
+        print(json.dumps({
+            "timestamp": str(datetime.now()) if 'datetime' in globals() else "",
+            "issues_count": len(all_issues),
+            "issues": all_issues
+        }, indent=2))
+        sys.exit(1 if any(i['severity'] in ['CRITICAL', 'HIGH'] for i in all_issues) else 0)
+
     if not all_issues:
         print(f'{GREEN}✅ No security issues found. System is hardened.{RESET}')
     else:
@@ -234,6 +267,12 @@ def main():
         for issue in all_issues:
             sev_color = RED if issue['severity'] == 'CRITICAL' else YELLOW
             print(f"[{sev_color}{issue['severity']}{RESET}] {issue['id']}\nDescription: {issue['description']}\nRecommendation: {issue['recommendation']}\n")
+        
+        # Exit with error if critical issues found
+        if any(i['severity'] in ['CRITICAL', 'HIGH'] for i in all_issues):
+            sys.exit(1)
 
 if __name__ == '__main__':
+    # Add datetime import if missing for JSON output
+    from datetime import datetime
     main()

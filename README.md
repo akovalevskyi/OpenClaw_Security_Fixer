@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 OpenClaw Security Toolkit v1.1 🛡️
+# 🦀 OpenClaw Security Toolkit v1.2 🛡️
 
 ```text
        ___     🛡️      ___
@@ -14,76 +14,59 @@
        / /          \ \
       "-"            "-"
 ```
-**The Unyielding Guardian of Your AI Agent**
+**The Enterprise-Grade Guardian of Your AI Agent**
 
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![Environment: Hostinger VPS](https://img.shields.io/badge/Environment-Hostinger_VPS-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![CI: Passing](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=github-actions)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
+[![Version: 1.2](https://img.shields.io/badge/Version-1.2_Enterprise-blue?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
 
 </div>
 
-> [!IMPORTANT]
-> **Note on Compatibility:** This toolkit was developed on **Hostinger VPS**. It is designed to be compatible with **99% of standard Linux VPS environments** (Ubuntu/Debian) using Docker.
+## 🛡️ v1.2 Enterprise Updates (New!)
+
+We've elevated the toolkit to professional standards:
+
+*   **Machine-Readable Output:** Support for `--json` flag in audit, allowing for easy integration with CI/CD and SOC monitoring.
+*   **Entropy-Based Secret Scanning:** Beyond simple regex, we now use **Shannon Entropy** to detect unknown high-entropy strings (potential API keys) that don't match known patterns.
+*   **Formal Threat Modeling:** Added `docs/THREAT_MODEL.md` to map attack vectors and mitigations.
+*   **Automated Test Suite:** Initialized `tests/` with `pytest` support to ensure audit logic remains reliable.
+*   **Versioned Backups:** Enhanced configuration management with persistent, timestamped rollback points.
 
 ---
 
-## 🚀 Quick Start (OpenClaw Integration)
+## 🚀 Quick Start
 
-To use this toolkit as a skill within your OpenClaw environment:
-
-1. **Clone to your Skills directory:**
+1. **Install:**
    ```bash
    git clone https://github.com/akovalevskyi/OpenClaw_Security_Fixer.git security-toolkit
    cd security-toolkit
    pip install -r requirements.txt
    ```
 
-2. **Interactive Menu (v1.1 Hardened):**
+2. **Run Interactive Menu:**
    ```bash
    ./openclaw-secure.sh
    ```
-   *Now supports **Dry-Run** mode and **Auto-Backups**!*
 
 ---
 
-## 🛡️ v1.1 Hardened Features (New!)
+## 🛡️ Key Security Features
 
-We've improved the toolkit based on professional security audits:
+### 1. Agentic Guardrails
+*   **Egress Control:** Blocks unauthorized network calls from the sandbox.
+*   **Autonomy Bounds:** Limits recursion, steps, and session timeouts.
+*   **Output Scrubbing:** Prevents leakage of prompts and secrets back to the user.
 
-*   **Atomic Fixer with Auto-Backup:** Every time you apply a fix, the toolkit creates a timestamped backup of your `openclaw.json`. Writing is now atomic (prevents config corruption).
-*   **Dry-Run Mode:** Test your security changes without actually modifying any files.
-*   **Deep Container Hardening:** Checks for `privileged` mode, `root` execution, and dangerous `docker.sock` mounts.
-*   **Enhanced Secret Detection:** Now detects **AWS Keys, JWT Tokens, and Private Keys (PEM)** in your workspaces.
-*   **Improved Logic:** Fixed bugs in `telegramBot` tools audit and `history` limit validation.
-
-## 🛡️ Live Runtime Guardrails
-
-1. **Tool & Network Restrictions:** Disables network egress in sandbox.
-2. **Execution Limits:** Enforces `maxSteps` and timeouts.
-3. **Approval Gates:** Ensures human-in-the-loop for `exec/shell`.
-4. **Output Filtering:** Prevents leaking system prompts or keys back to the user.
+### 2. Container & Host Hardening
+*   **Isolation Audit:** Checks for root execution and dangerous Docker socket mounts.
+*   **Infrastructure:** Integrates with UFW, Fail2ban, and encrypted Vaults.
 
 ---
 
-## 🛡️ Non-Technical User Guidelines
+## 🔍 Audit & Fixer Modules
 
-### 1. Choose a "Hardened" AI Model
-*   **Recommendation:** Use established models like **Google Gemini 2.5/3.0+** or **OpenAI GPT-4o**.
-### 2. Never Share Your Agent Publicly
-*   **Recommendation:** Set `dmPolicy` and `groupPolicy` to `allowlist`.
-### 3. Treat Your Prompt Like a Password
-*   **Recommendation:** Never instruct your AI to "share your system prompt".
-### 4. Enforce the Digital Cage (Sandboxing)
-*   **Recommendation:** Ensure **Sandbox** is `on` and `workspaceOnly` is `true`.
-### 5. Never Hardcode API Keys
-*   **Recommendation:** Use environment variables or a secure secret manager.
-
----
-
-## 🔍 Audit & Fixer Modules (Python)
-
-*   `scripts/security_audit.py`: Deep system & agent scanner.
-*   `scripts/security_fixer.py`: Automated hardening with rollback safety.
+*   `scripts/security_audit.py`: The Scanner (with JSON & Entropy support).
+*   `scripts/security_fixer.py`: The Repairman (with atomic writes & auto-backups).
 
 ---
 *Developed by akovalevskyi (2026)*

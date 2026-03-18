@@ -102,6 +102,22 @@ This toolkit integrates three industry-standard frameworks for auditing the **AI
 
 ---
 
+
+## 🛡️ Live Runtime Guardrails (Agentic Security)
+
+To move beyond basic server hardening, this toolkit enforces strict runtime boundaries directly on the AI agent to prevent autonomous exploitation:
+
+1. **Tool & Network Restrictions (Egress Control):**
+   - Automatically disables network egress within the agent's sandbox (`network: "none"`). Prevents the AI from phoning home or downloading arbitrary payloads if compromised.
+2. **Execution Limits & Timeouts:**
+   - Enforces strict bounds on agent autonomy (e.g., maximum recursion steps, tool-call caps, and overall session timeouts) to prevent infinite loops and financial DoS.
+3. **Approval Gates:**
+   - Audits for the presence of "human-in-the-loop" confirmation gates for destructive or highly privileged tools (e.g., `exec`, `shell`).
+4. **Live Output Filtering:**
+   - Checks for active middleware designed to intercept and scrub outbound messages, ensuring the agent cannot leak its system prompt or discovered secrets back to a user.
+
+---
+
 ## 🔍 Audit & Fixer Modules (Python)
 
 ### `security_audit.py` (The Scanner)

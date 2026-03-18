@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 OpenClaw Security Toolkit v1.3 🛡️
+# 🦀 OpenClaw Security Toolkit 🛡️
 
 ```text
        ___     🛡️      ___
@@ -14,102 +14,91 @@
        / /          \ \
       "-"            "-"
 ```
-**The Production-Ready Guardian of Your AI Agent**
+**A practical hardening and audit toolkit for OpenClaw deployments**
 
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![Environment: Hostinger VPS](https://img.shields.io/badge/Environment-Hostinger_VPS-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![Version: 1.3](https://img.shields.io/badge/Version-1.3_Production-orange?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
+[![Environment: Linux/Docker](https://img.shields.io/badge/Environment-Linux_Docker-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
+[![Version: 1.4](https://img.shields.io/badge/Version-1.4_Hardened-orange?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 </div>
 
 > [!IMPORTANT]
-> **Note on Compatibility:** This toolkit was developed and rigorously tested on **Hostinger VPS** infrastructure. While settings may vary slightly depending on your provider's specific OS image or kernel configuration, it is designed to be compatible with **99% of standard Linux VPS environments** (Ubuntu/Debian/CentOS) using Docker.
+> **Production Readiness:** This toolkit provides automated hardening and audit capabilities. However, security is a process. Always review the [Manual Checklist](docs/openclaw_security_checklist.md) and understand the changes being applied.
 
 ---
 
-## 🛡️ v1.3 Production Updates (New!)
+## ✅ Implemented in the Current Version (v1.4)
 
-We've synchronized the toolkit with the latest live configurations and feedback from security audits:
-
-*   **Host Infrastructure Audit:** Now checks for SSH hardening (Port 2244, disabled passwords) directly on the host.
-*   **Live Docker Environment Audit:** Automatically inspects running OpenClaw containers for leaked API keys in ENV variables.
-*   **Entropy-Based Secret Scanning:** Beyond simple regex, we now use **Shannon Entropy** to detect unknown high-entropy strings (potential API keys) that don't match known patterns.
-*   **Atomic Fixer with Auto-Backup:** Every time you apply a fix, the toolkit creates a timestamped backup of your config. Writing is now atomic to prevent corruption.
-*   **Formal Threat Modeling:** Included `docs/THREAT_MODEL.md` to map attack vectors and mitigations.
+*   **Reliable Host Audit:** Evaluates effective SSH configuration using `sshd -T` (not just simple grep).
+*   **Dynamic Container Discovery:** Automatically detects OpenClaw/Gateway containers and inspects their runtime environment.
+*   **Safe Hardening (Atomic Writes):** All configuration changes are written atomically via temp files to prevent corruption.
+*   **Automatic Backups:** Creates timestamped `.bak` files before any modification.
+*   **Interactive Fixer:** A guided mode to review and approve every security improvement before it's applied.
+*   **Profile Support:** Choose between `minimal`, `recommended`, and `paranoid` security levels.
+*   **Workspace Protection:** Scans and can redact secrets (OpenAI, GitHub, JWT, etc.) in workspace files.
+*   **Standardized JSON Output:** Machine-readable audit reports ready for CI/CD integration.
 
 ---
 
-## 🚀 Quick Start (OpenClaw Integration)
+## 🚀 Quick Start
 
-1. **Run via Agent (Easiest):**
-   Copy and send this message to your OpenClaw agent to automatically install and run an audit:
-   ```text
-   Please install the security toolkit from https://github.com/akovalevskyi/OpenClaw_Security_Fixer and run a full security audit.
-   ```
-
-2. **Clone to your Skills directory (Manual):**
-   Navigate to your OpenClaw skills folder on the VPS and run:
+1. **Install:**
    ```bash
    git clone https://github.com/akovalevskyi/OpenClaw_Security_Fixer.git security-toolkit
    cd security-toolkit
    pip install -r requirements.txt
    ```
 
-3. **Interactive Menu (v1.3 Production):**
-   We have included a beautiful, color-coded interactive wrapper for easy use via SSH. It now supports **Dry-Run** mode and **Auto-Backups**!
+2. **Interactive Menu:**
+   The recommended way to use the toolkit.
    ```bash
    ./openclaw-secure.sh
+   ```
+
+3. **CLI Usage:**
+   ```bash
+   # Run audit and output JSON
+   python3 scripts/security_audit.py --json
+   
+   # Run fixer in dry-run mode
+   python3 scripts/security_fixer.py --dry-run
+   
+   # Run fixer in interactive mode with paranoid profile
+   python3 scripts/security_fixer.py --interactive --profile=paranoid
    ```
 
 ---
 
 ## 🛡️ Key Security Features
 
-### 1. Live Runtime Guardrails (Agentic Security)
-This toolkit enforces strict runtime boundaries directly on the AI agent to prevent autonomous exploitation:
-- **Egress Control:** Automatically disables unauthorized network calls from the sandbox.
-- **Execution Limits:** Enforces strict bounds on `maxSteps` and session timeouts to prevent financial DoS.
-- **Approval Gates:** Audits for "human-in-the-loop" confirmation for dangerous tools (`exec`, `shell`).
-- **Output Scrubbing:** Prevents leakage of system prompts or discovered secrets back to the user.
+### 1. Agentic Security & Guardrails
+- **Sandboxing Audit:** Verifies that agents are restricted to their workspace and have no direct network access.
+- **Execution Limits:** Audits and enforces `maxSteps`, `timeoutMs`, and history limits.
+- **Tool Policy:** Checks for denylists of dangerous tools (`exec`, `bash`, `cron`) on public-facing channels.
 
-### 2. Advanced AI & LLM Security Integration
-The toolkit is designed to work alongside industry-standard frameworks for auditing the AI layer:
-- **Promptfoo (Compliance):** Automated evaluation of prompts to ensure they follow safety guidelines.
-- **Garak (Vulnerability Scanner):** Specialized Nmap-style scanner for LLMs to find injection vectors.
-- **PyRIT (Red-Teaming):** Microsoft's framework for multi-turn adversarial attacks (e.g., "Crescendo").
+### 2. Secret Management
+- **ENV Inspection:** Checks if sensitive API keys are exposed in container environment variables.
+- **Pattern & Entropy Scanning:** Heuristic detection of secrets in workspaces using both known patterns and Shannon Entropy.
 
 ### 3. Container & Host Hardening
-- **Isolation Audit:** Checks for non-root execution and blocks dangerous `docker.sock` mounts.
-- **Infrastructure Infrastructure:** Integrates with UFW firewall, Fail2ban protection, and encrypted Vaults for secret management.
+- **Infrastructure Audit:** Verifies SSH port, password auth status, and root login settings.
+- **Runtime Security:** Checks for privileged mode, writable rootfs, and missing `no-new-privileges` flags.
 
 ---
 
-## 🛡️ Non-Technical User Guidelines (How to not get hacked)
-
-If you are not deeply technical, follow these **5 Golden Rules** to keep your agent (and your wallet) safe:
-
-### 1. Choose a "Hardened" AI Model
-Use the latest established models from trusted providers like **OpenAI (GPT)**, **Google Gemini**, or **Anthropic Claude**. These top-tier providers invest millions in "red-teaming" to resist prompt injections. **Warning:** Using unverified or experimental models puts your agent's security at significant risk, as they often lack the robust safety guardrails needed to prevent manipulation.
-
-### 2. Never Share Your Agent Publicly
-In your OpenClaw settings, ensure your Telegram or Signal `dmPolicy` and `groupPolicy` are set to `allowlist`. Never let unknown users chat with your bot.
-
-### 3. Treat Your Prompt Like a Password
-Instructions in your `SOUL.md` are sensitive. Never instruct your AI to "share your system prompt" with users.
-
-### 4. Enforce the Digital Cage (Sandboxing)
-Always ensure the **Sandbox** is turned `on` and `workspaceOnly` is set to `true`. Our automatic fixer script does this for you!
-
-### 5. Never Hardcode API Keys
-Never type your `sk-...` keys directly into text files or your prompt. Use environment variables or a secure secret manager like our `vault.sh` integration.
+## 🔌 Compatibility & External Tools
+The toolkit is compatible with and complements:
+- **Promptfoo:** For prompt compliance and regression testing.
+- **Garak:** For LLM vulnerability scanning.
+- **PyRIT:** For adversarial red-teaming.
 
 ---
 
-## 🔍 Audit & Fixer Modules (Python)
+## 🔍 Audit & Fixer Modules
 
-*   `scripts/security_audit.py`: The Scanner (with JSON, SSH, and Entropy support).
-*   `scripts/security_fixer.py`: The Repairman (with atomic writes and auto-backups).
+*   `scripts/security_audit.py`: The Scanner (Infrastructure, Container, and Configuration).
+*   `scripts/security_fixer.py`: The Repairman (Backups, Atomic Writes, and Profiles).
 
 ---
 *Developed by akovalevskyi (2026)*

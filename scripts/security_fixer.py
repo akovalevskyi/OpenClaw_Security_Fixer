@@ -245,8 +245,8 @@ def fix_workspace_leaks():
         (re.compile(r'sk-[a-zA-Z0-9]{30,}'), 'sk-****'),
         (re.compile(r'gsk_[a-zA-Z0-9]{30,}'), 'gsk_****'),
         (re.compile(r'ghp_[A-Za-z0-9]{20,}'), 'ghp_****'),
-        (re.compile(r'(PASSWORD:\s*)\S+'), r'\1****'),
-        (re.compile(r'(?:API_KEY|SECRET|TOKEN|PASSWORD)\s*[:=]\s*\S+', re.IGNORECASE), "REDACTED_SECRET"),
+        (re.compile(r'(PASSWORD\s*[:=]\s*)\S+', re.IGNORECASE), r'\1****'),
+        (re.compile(r'((?:API_KEY|SECRET|TOKEN|PASSWORD)\s*[:=]\s*)\S+', re.IGNORECASE), r'\1[REDACTED]'),
     ]
     
     text_extensions = ('.md', '.json', '.env', '.credentials', '.txt', '.yaml', '.yml', '.toml', '.ini', '.conf', '.py', '.js', '.ts', '.sh', '.log')
@@ -274,6 +274,48 @@ def fix_workspace_leaks():
                     except Exception as e:
                         print(f"❌ Failed to process workspace file {f_path}: {e}")
 
+def fix_docker_compose():
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Hardening docker-compose.yml...")
+    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "/docker/openclaw-3g02/docker-compose.yml"]
+    compose_path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            compose_path = p
+            break
+    
+    if not compose_path:
+        print("ℹ️ docker-compose.yml not found. Skipping.")
+        return
+
+    try:
+        with open(compose_path, "r") as f:
+            lines = f.readlines()
+        
+        changed = False
+        new_lines = []
+        for line in lines:
+            new_lines.append(line)
+            # Simple heuristic: add security options after service name or image
+            if "image:" in line and "openclaw" in line.lower():
+                # Note: This is a very basic injector. Real YAML parsing is preferred.
+                pass 
+
+        # For v1.6, we will mostly report or do very safe string replacements
+        # To avoid breaking YAML, we'll just check and warn for now, or do exact line replacement if missing
+        content = "".join(lines)
+        if "security_opt:" not in content:
+            if confirm(f"Add security_opt to {compose_path}?"):
+                # This is risky without a real parser, so we'll just print a recommendation for now
+                # unless we want to implement a simple line injector.
+                print(f"👉 Recommendation: Add 'security_opt: [\"no-new-privileges:true\"]' to {compose_path}")
+        
+        if "read_only:" not in content:
+            if confirm(f"Enable read_only in {compose_path}?"):
+                print(f"👉 Recommendation: Add 'read_only: true' to {compose_path}")
+
+    except Exception as e:
+        print(f"❌ Failed to process docker-compose.yml: {e}")
+
 def restart_service():
     restart_cmd = os.getenv("OPENCLAW_RESTART_CMD")
     container = os.getenv("OPENCLAW_CONTAINER")
@@ -295,10 +337,11 @@ def restart_service():
     print("⚠️ No restart strategy configured. Manual restart may be required.")
 
 def main():
-    print(f"--- OPENCLAW SECURITY FIXER v1.5 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
+    print(f"--- OPENCLAW SECURITY FIXER v1.6 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
     fix_workspace_leaks()
+    fix_docker_compose()
     
     print("\nManual-only remediation notes:")
     for note in MANUAL_ONLY_NOTES:

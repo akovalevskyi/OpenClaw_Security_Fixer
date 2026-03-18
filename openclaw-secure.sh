@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# OpenClaw Security Toolkit v1.5 - Interactive Menu
+# OpenClaw Security Toolkit v1.6 - Interactive Menu
 
 # Colors and formatting
 GREEN='\033[0;32m'
@@ -33,7 +33,7 @@ echo "       / /          \ \    "
 echo "      \"-\"            \"-\"   "
 echo -e "${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
-echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - v1.5 Hardened   ${NC}"
+echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - v1.6 Hardened   ${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
 echo ""
 

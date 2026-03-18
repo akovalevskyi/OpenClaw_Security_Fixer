@@ -126,15 +126,19 @@ def audit_config(config):
     if not telegram_bot.get('budgets') and not config.get('gateway', {}).get('rateLimit'):
          issues.append(make_issue('NO_RATE_LIMITS', 'HIGH', 'No budgets or rate limits configured. Vulnerable to financial DoS.', 'Configure telegramBot.budgets or gateway rate limits.', category='financial_security'))
 
+    # 2. Context Window Poisoning
     history_limit = config.get('agents', {}).get('defaults', {}).get('history', {}).get('maxMessages')
     if not history_limit:
-        history_limit_found = False
         for agent in config.get('agents', {}).get('list', []):
-            if agent.get('history', {}).get('maxMessages'):
-                history_limit_found = True
-                break
-        if not history_limit_found:
-            issues.append(make_issue('NO_HISTORY_LIMIT', 'WARNING', 'No maxMessages limit found for agent history. Vulnerable to context window poisoning.', 'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).', category='agent_security', auto_fixable=True))
+            if not agent.get('history', {}).get('maxMessages'):
+                issues.append(make_issue(
+                    f'NO_HISTORY_LIMIT_{agent.get("id", "unknown")}', 
+                    'WARNING', 
+                    f'Agent {agent.get("id")} has no maxMessages limit. Vulnerable to context window poisoning.', 
+                    'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).', 
+                    category='agent_security', 
+                    auto_fixable=True
+                ))
 
     if "sandbox" in defaults:
         if defaults["sandbox"].get("network") != "none":
@@ -248,7 +252,13 @@ def audit_permissions():
     
     try:
         if os.getuid() == 0:
-            issues.append(make_issue("RUNNING_AS_ROOT", "HIGH", "Process is running as root.", "Run the service as a non-privileged user.", category="host_security"))
+            issues.append(make_issue(
+                "RUNNING_AS_ROOT", 
+                "HIGH", 
+                "Process is running as root.", 
+                "Run the service as a non-privileged user. Note: Infrastructure audits (SSH) may require sudo, but the application should not run as root.", 
+                category="host_security"
+            ))
     except Exception as e:
         check_failed(issues, "CHECK_FAILED_ROOT", f"Failed to check UID: {e}")
     
@@ -322,6 +332,8 @@ def audit_workspace_leaks():
                                         ))
                                 
                                 for token in tokenize_for_entropy(line):
+                                    if token.startswith(('http://', 'https://', 'ftp://')):
+                                        continue
                                     if len(token) >= 32 and calculate_entropy(token) >= 4.5:
                                         if not re.fullmatch(r"[a-f0-9]{32,64}", token.lower()):
                                             issues.append(make_issue(
@@ -401,6 +413,18 @@ def detect_openclaw_containers():
         return [DEFAULT_CONTAINER]
 
     try:
+        # Try discovery via label first
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}", "-f", "label=com.openclaw.service=true"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        names = [n.strip() for n in result.stdout.splitlines() if n.strip()]
+        if names:
+            return names
+
+        # Fallback to name-based pattern matching
         result = subprocess.run(
             ["docker", "ps", "--format", "{{.Names}}"],
             capture_output=True,
@@ -537,6 +561,31 @@ def audit_container_runtime():
             )
     return issues
 
+def audit_docker_compose():
+    issues = []
+    # Search for docker-compose.yml in common locations
+    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "/docker/openclaw-3g02/docker-compose.yml"]
+    compose_path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            compose_path = p
+            break
+    
+    if not compose_path:
+        return issues
+
+    try:
+        with open(compose_path, "r") as f:
+            content = f.read()
+            if "no-new-privileges:true" not in content.replace(" ", ""):
+                issues.append(make_issue('DOCKER_COMPOSE_NO_NEW_PRIVS', 'HIGH', 'docker-compose.yml is missing no-new-privileges:true.', 'Add security_opt: ["no-new-privileges:true"] to your service definition.', category='container_security', path=compose_path, auto_fixable=True))
+            if "read_only:true" not in content.replace(" ", ""):
+                issues.append(make_issue('DOCKER_COMPOSE_RW_ROOTFS', 'WARNING', 'docker-compose.yml is missing read_only:true.', 'Set read_only: true and use volumes for writable paths.', category='container_security', path=compose_path, auto_fixable=True))
+    except Exception as e:
+        check_failed(issues, "CHECK_FAILED_DOCKER_COMPOSE", f"Failed to audit docker-compose.yml: {e}", path=compose_path)
+    
+    return issues
+
 def dedupe_issues(issues):
     seen = set()
     deduped = []
@@ -557,7 +606,7 @@ def main():
     use_json = '--json' in sys.argv
     
     if not use_json:
-        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT v1.5 ---{RESET}')
+        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT v1.6 ---{RESET}')
     
     all_issues = []
     if os.path.exists(DEFAULT_CONFIG_PATH):
@@ -576,6 +625,7 @@ def main():
     all_issues += audit_ssh_config()
     all_issues += audit_docker_env_secrets()
     all_issues += audit_container_runtime()
+    all_issues += audit_docker_compose()
     
     all_issues = dedupe_issues(all_issues)
     

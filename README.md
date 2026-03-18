@@ -1,5 +1,20 @@
 # OpenClaw Security Toolkit (Advanced)
 
+```text
+            ________
+        ---/  ____  \---
+          /  /    \  \
+   ---   |  | ^  ^ |  |   ---
+  /   \  |  |  __  |  |  /   \
+ |  |  |  \  \____/  /  |  |  |
+  \   /    \________/    \   /
+   ---      /      \      ---
+           / [SHIELD] \
+          /____________\
+             /|    |\
+            / |____| \
+```
+
 ## Overview & Architecture
 
 **OpenClaw Security Toolkit** is a comprehensive suite of scripts and protocols designed for deep security auditing and automated hardening of the OpenClaw AI agent environment.

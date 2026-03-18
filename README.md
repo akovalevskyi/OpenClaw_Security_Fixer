@@ -91,7 +91,7 @@ The toolkit is designed to work alongside industry-standard frameworks for audit
 If you are not deeply technical, follow these **5 Golden Rules** to keep your agent (and your wallet) safe:
 
 ### 1. Choose a "Hardened" AI Model
-Use the latest established models from trusted providers like **OpenAI (GPT-4o/5)**, **Google Gemini (1.5 Pro/2.0/3.0+)**, or **Anthropic Claude (3.5 Sonnet/3.7/4)**. These top-tier providers invest millions in "red-teaming" to resist prompt injections. **Warning:** Using unverified or experimental models puts your agent's security at significant risk, as they often lack the robust safety guardrails needed to prevent manipulation.
+Use the latest established models from trusted providers like **OpenAI (GPT)**, **Google Gemini**, or **Anthropic Claude**. These top-tier providers invest millions in "red-teaming" to resist prompt injections. **Warning:** Using unverified or experimental models puts your agent's security at significant risk, as they often lack the robust safety guardrails needed to prevent manipulation.
 
 ### 2. Never Share Your Agent Publicly
 In your OpenClaw settings, ensure your Telegram or Signal `dmPolicy` and `groupPolicy` are set to `allowlist`. Never let unknown users chat with your bot.

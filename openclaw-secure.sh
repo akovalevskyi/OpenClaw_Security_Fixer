@@ -28,7 +28,7 @@ echo "       / /          \ \    "
 echo "      \"-\"            \"-\"   "
 echo -e "${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
-echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - v1.2 Enterprise  ${NC}"
+echo -e "${BLUE}${BOLD}   OpenClaw Security Toolkit - v1.3 Production   ${NC}"
 echo -e "${BLUE}${BOLD}================================================${NC}"
 echo ""
 

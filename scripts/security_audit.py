@@ -231,6 +231,39 @@ def audit_workspace_leaks():
                     except: pass
     return issues
 
+def audit_infrastructure():
+    issues = []
+    # 1. SSH Hardening (based on VPS config)
+    try:
+        def get_ssh_val(pattern):
+            result = subprocess.run(f"grep -i '^{pattern}' /etc/ssh/sshd_config", shell=True, capture_output=True, text=True)
+            if result.stdout:
+                parts = result.stdout.strip().split()
+                if len(parts) >= 2: return parts[1]
+            return None
+
+        port = get_ssh_val("Port")
+        pw_auth = get_ssh_val("PasswordAuthentication")
+        
+        if port and port != "2244":
+            issues.append({'id': 'SSH_NON_STANDARD_PORT', 'severity': 'WARNING', 'description': f'SSH is running on port {port} (expected 2244)', 'recommendation': 'Set Port 2244 in sshd_config'})
+        if pw_auth and pw_auth.lower() == "yes":
+            issues.append({'id': 'SSH_PW_AUTH_ENABLED', 'severity': 'CRITICAL', 'description': 'SSH Password Authentication is enabled.', 'recommendation': 'Set PasswordAuthentication no'})
+    except: pass
+    
+    # 2. Docker ENV Secrets (Live check)
+    try:
+        container = "openclaw-3g02-openclaw-1"
+        result = subprocess.run(f"docker inspect {container} --format '{{{{range .Config.Env}}}}{{{{println .}}}}{{{{end}}}}'", shell=True, capture_output=True, text=True)
+        if result.stdout:
+            dangerous_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY", "TELEGRAM_BOT_TOKEN"]
+            for key in dangerous_keys:
+                if key in result.stdout:
+                    issues.append({'id': 'DOCKER_ENV_LEAK', 'severity': 'CRITICAL', 'description': f'Secret {key} exposed in Docker environment variables.', 'recommendation': 'Use vault.sh or .env files instead of docker-compose environment section.'})
+    except: pass
+    
+    return issues
+
 def main():
     use_json = '--json' in sys.argv
     
@@ -251,6 +284,7 @@ def main():
     all_issues += audit_permissions()
     all_issues += audit_workspace_leaks()
     all_issues += audit_prompt_integrity()
+    all_issues += audit_infrastructure()
     
     if use_json:
         print(json.dumps({

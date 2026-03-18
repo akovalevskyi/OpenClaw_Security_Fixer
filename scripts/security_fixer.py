@@ -151,7 +151,7 @@ def fix_workspace_leaks():
                     except: pass
 
 def main():
-    print(f"--- OPENCLAW SECURITY FIXER v1.1 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
+    print(f"--- OPENCLAW SECURITY FIXER v1.3 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
     fix_workspace_leaks()
@@ -160,6 +160,7 @@ def main():
         print("\n⚠️ Restarting Gateway via docker (if available)...")
         # Attempt common restart methods
         try:
+            # We try the specific container name from the VPS environment
             subprocess.run(["docker", "restart", "openclaw-3g02-openclaw-1"], check=False)
             print("✅ Docker restart command sent.")
         except:

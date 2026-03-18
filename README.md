@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 OpenClaw Security Toolkit v1.2 🛡️
+# 🦀 OpenClaw Security Toolkit v1.3 🛡️
 
 ```text
        ___     🛡️      ___
@@ -14,23 +14,21 @@
        / /          \ \
       "-"            "-"
 ```
-**The Enterprise-Grade Guardian of Your AI Agent**
+**The Production-Ready Guardian of Your AI Agent**
 
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![CI: Passing](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=github-actions)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
-[![Version: 1.2](https://img.shields.io/badge/Version-1.2_Enterprise-blue?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
+[![Version: 1.3](https://img.shields.io/badge/Version-1.3_Production-blue?style=for-the-badge)](https://github.com/akovalevskyi/OpenClaw_Security_Fixer)
 
 </div>
 
-## 🛡️ v1.2 Enterprise Updates (New!)
+## 🛡️ v1.3 Production Updates (New!)
 
-We've elevated the toolkit to professional standards:
+We've synchronized the toolkit with the latest live configurations from our Hostinger VPS environment:
 
-*   **Machine-Readable Output:** Support for `--json` flag in audit, allowing for easy integration with CI/CD and SOC monitoring.
-*   **Entropy-Based Secret Scanning:** Beyond simple regex, we now use **Shannon Entropy** to detect unknown high-entropy strings (potential API keys) that don't match known patterns.
-*   **Formal Threat Modeling:** Added `docs/THREAT_MODEL.md` to map attack vectors and mitigations.
-*   **Automated Test Suite:** Initialized `tests/` with `pytest` support to ensure audit logic remains reliable.
-*   **Versioned Backups:** Enhanced configuration management with persistent, timestamped rollback points.
+*   **Host Infrastructure Audit:** Now checks for SSH hardening (Port 2244, disabled passwords) directly on the host.
+*   **Live Docker Environment Audit:** Automatically inspects running OpenClaw containers for leaked API keys in ENV variables.
+*   **Production Environment Awareness:** Fine-tuned logic for container names and actual directory structures used in production.
+*   **Comprehensive Secret Scanning:** Improved entropy-based detection and regex patterns for even more secret types.
 
 ---
 

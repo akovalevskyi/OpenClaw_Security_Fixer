@@ -42,9 +42,13 @@ We've synchronized the toolkit with the latest live configurations and feedback 
 
 ## 🚀 Quick Start (OpenClaw Integration)
 
-To use this toolkit as a skill within your OpenClaw environment:
+1. **Run via Agent (Easiest):**
+   Copy and send this message to your OpenClaw agent to automatically install and run an audit:
+   ```text
+   Please install the security toolkit from https://github.com/akovalevskyi/OpenClaw_Security_Fixer and run a full security audit.
+   ```
 
-1. **Clone to your Skills directory:**
+2. **Clone to your Skills directory (Manual):**
    Navigate to your OpenClaw skills folder on the VPS and run:
    ```bash
    git clone https://github.com/akovalevskyi/OpenClaw_Security_Fixer.git security-toolkit
@@ -52,16 +56,11 @@ To use this toolkit as a skill within your OpenClaw environment:
    pip install -r requirements.txt
    ```
 
-2. **Interactive Menu (v1.3 Production):**
+3. **Interactive Menu (v1.3 Production):**
    We have included a beautiful, color-coded interactive wrapper for easy use via SSH. It now supports **Dry-Run** mode and **Auto-Backups**!
    ```bash
    ./openclaw-secure.sh
    ```
-
-3. **Run via Agent:**
-   Register the path to this folder in your `openclaw.json` under the `skills` section. You can now ask your OpenClaw agent:
-   - *"Run a security audit using the security toolkit"*
-   - *"Apply security fixes to my VPS"*
 
 ---
 

@@ -564,7 +564,7 @@ def audit_container_runtime():
 def audit_docker_compose():
     issues = []
     # Search for docker-compose.yml in common locations
-    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "/docker/openclaw-3g02/docker-compose.yml"]
+    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "./docker-compose.yaml"]
     compose_path = None
     for p in possible_paths:
         if os.path.exists(p):

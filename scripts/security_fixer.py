@@ -276,7 +276,7 @@ def fix_workspace_leaks():
 
 def fix_docker_compose():
     print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Hardening docker-compose.yml...")
-    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "/docker/openclaw-3g02/docker-compose.yml"]
+    possible_paths = ["docker-compose.yml", "../docker-compose.yml", "./docker-compose.yaml"]
     compose_path = None
     for p in possible_paths:
         if os.path.exists(p):

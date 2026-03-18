@@ -1,19 +1,26 @@
-# OpenClaw Security Toolkit (Advanced)
+<div align="center">
+
+# 🦀 OpenClaw Security Toolkit 🛡️
 
 ```text
-            ________
-        ---/  ____  \---
-          /  /    \  \
-   ---   |  | ^  ^ |  |   ---
-  /   \  |  |  __  |  |  /   \
- |  |  |  \  \____/  /  |  |  |
-  \   /    \________/    \   /
-   ---      /      \      ---
-           / [SHIELD] \
-          /____________\
-             /|    |\
-            / |____| \
+       ___     🛡️      ___
+      /   \  [====]  /   \
+     |  |  |  \__/  |  |  |
+      \  \ \__/__\__/ /  /
+       \__\  (o o)  /__/
+          | /_++_\ |
+         /  |____|  \
+        / /        \ \
+       / /          \ \
+      "-"            "-"
 ```
+**The Unyielding Guardian of Your AI Agent**
+
+[![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge&logo=shield)](https://github.com/akovalevskyi/termuxtest)
+[![Environment: VPS](https://img.shields.io/badge/Environment-VPS-blue?style=for-the-badge&logo=linux)](https://github.com/akovalevskyi/termuxtest)
+[![Agent: OpenClaw](https://img.shields.io/badge/Agent-OpenClaw-orange?style=for-the-badge)](https://github.com/akovalevskyi/termuxtest)
+
+</div>
 
 ## Overview & Architecture
 

@@ -78,6 +78,30 @@ def fix_config():
             changed = True
             print(f"✅ Added \"{tool}\" to telegramBot.tools.deny")
 
+    # ADVANCED AI SECURITY FIXES
+    # 1. Add Default Rate Limiting if none exists
+    if "gateway" not in config: config["gateway"] = {}
+    if not config["gateway"].get("rateLimit"):
+        config["gateway"]["rateLimit"] = {"max": 100, "timeWindow": 60000}
+        changed = True
+        print("✅ Added default Gateway Rate Limit (100 req/min)")
+        
+    # 2. Add History Boundary (Context Window limit)
+    if "agents" not in config: config["agents"] = {}
+    if "defaults" not in config["agents"]: config["agents"]["defaults"] = {}
+    if "history" not in config["agents"]["defaults"]: config["agents"]["defaults"]["history"] = {}
+    
+    # Check if a limit already exists in defaults or any agent
+    limit_exists = False
+    if config["agents"]["defaults"]["history"].get("maxMessages"): limit_exists = True
+    for a in config.get("agents", {}).get("list", []):
+        if a.get("history", {}).get("maxMessages"): limit_exists = True
+        
+    if not limit_exists:
+        config["agents"]["defaults"]["history"]["maxMessages"] = 50
+        changed = True
+        print("✅ Added default Agent History Limit (maxMessages: 50)")
+
     # END_CUSTOM_CONFIG_FIXES
 
     if changed:

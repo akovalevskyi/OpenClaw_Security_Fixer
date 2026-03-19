@@ -3,6 +3,13 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+
+# gemini-cli settings
+.gemini/
+
+# GitHub App credentials
+gha-creds-*.json
+
 env/
 venv/
 .venv/

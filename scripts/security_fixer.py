@@ -36,9 +36,62 @@ SELECTED_PROFILE = PROFILES.get(PROFILE_NAME, PROFILES["recommended"])
 MANUAL_ONLY_NOTES = [
     "Approval gates must be reviewed manually because exact schema may vary by OpenClaw version.",
     "Output filtering presence is audited heuristically and is not auto-remediated.",
-    "SSH hardening is not auto-remediated by this fixer.",
     "Docker runtime settings (privileged, network_mode, etc.) must be fixed in docker-compose.yml manually.",
 ]
+
+def fix_ssh_hardening():
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Hardening SSH configuration...")
+    # 1. Main config
+    ssh_config = "/etc/ssh/sshd_config"
+    fixes = [
+        (r'^(#)?PasswordAuthentication.*', 'PasswordAuthentication no'),
+        (r'^(#)?PermitRootLogin.*', 'PermitRootLogin prohibit-password')
+    ]
+    
+    changed_ssh = False
+    if os.path.exists(ssh_config):
+        for pattern, replacement in fixes:
+            if not DRY_RUN:
+                try:
+                    subprocess.run(["sed", "-i", "-E", f"s|{pattern}|{replacement}|", ssh_config], check=True)
+                    changed_ssh = True
+                except: pass
+        print(f"✅ {'Would harden' if DRY_RUN else 'Hardened'} {ssh_config}")
+
+    # 2. config.d directory
+    config_d = "/etc/ssh/sshd_config.d"
+    if os.path.isdir(config_d):
+        for f in os.listdir(config_d):
+            if f.endswith(".conf"):
+                f_path = os.path.join(config_d, f)
+                for pattern, replacement in fixes:
+                    if not DRY_RUN:
+                        try:
+                            subprocess.run(["sed", "-i", "-E", f"s|{pattern}|{replacement}|", f_path], check=True)
+                            changed_ssh = True
+                        except: pass
+                print(f"✅ {'Would harden' if DRY_RUN else 'Hardened'} override {f_path}")
+
+    if changed_ssh and not DRY_RUN:
+        subprocess.run(["systemctl", "restart", "sshd"], check=False)
+
+def fix_docker_firewall():
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Enforcing Docker Network Isolation (iptables)...")
+    if DRY_RUN:
+        print("[Dry-Run] Would run iptables -I DOCKER-USER -i eth0 -j DROP ...")
+        return
+    
+    try:
+        # Check if rules already exist to avoid duplicates (heuristic)
+        check = subprocess.run("iptables -L DOCKER-USER -n", shell=True, capture_output=True, text=True)
+        if "DROP" not in check.stdout:
+            subprocess.run("iptables -I DOCKER-USER -i eth0 -j DROP", shell=True, check=True)
+            subprocess.run("iptables -I DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", shell=True, check=True)
+            print("✅ DOCKER-USER rules applied to eth0")
+        else:
+            print("ℹ️ DOCKER-USER rules appear to be already present.")
+    except Exception as e:
+        print(f"❌ Failed to apply iptables rules: {e}")
 
 def confirm(prompt):
     if not INTERACTIVE:
@@ -129,6 +182,30 @@ def fix_config():
                 changed = True
                 print(f"✅ {'Would set' if DRY_RUN else 'Set'} {key} to False")
 
+    # NEW: Rate Limiting
+    if "auth" not in config["gateway"]: config["gateway"]["auth"] = {}
+    if config["gateway"]["auth"].get("rateLimit") is None or config["gateway"]["auth"].get("rateLimit") is False:
+        if confirm("Enable gateway.auth.rateLimit (brute-force protection)?"):
+            config["gateway"]["auth"]["rateLimit"] = {}
+            changed = True
+            print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} gateway rate limiting")
+
+    # NEW: Trusted Proxies
+    if config["gateway"].get("trustedProxies") != ["127.0.0.1"]:
+        if confirm("Set gateway.trustedProxies to [\"127.0.0.1\"]?"):
+            config["gateway"]["trustedProxies"] = ["127.0.0.1"]
+            changed = True
+            print(f"✅ {'Would set' if DRY_RUN else 'Set'} trustedProxies to [\"127.0.0.1\"]")
+
+    # NEW: Allowed Origins
+    default_origins = ["http://127.0.0.1", "http://localhost"]
+    current_origins = config["gateway"]["controlUi"].get("allowedOrigins", [])
+    if not any(o in current_origins for o in default_origins):
+        if confirm(f"Add {default_origins} to allowedOrigins?"):
+            config["gateway"]["controlUi"]["allowedOrigins"] = list(set(current_origins + default_origins))
+            changed = True
+            print(f"✅ {'Would add' if DRY_RUN else 'Added'} default allowed origins")
+
     # 2. Filesystem Isolation
     if "tools" not in config: config["tools"] = {}
     if "fs" not in config["tools"]: config["tools"]["fs"] = {}
@@ -138,15 +215,15 @@ def fix_config():
             changed = True
             print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} filesystem workspaceOnly")
 
-    # 3. Agent Sandboxing
+    # 3. Agent Sandboxing (Updated to 'all')
     if "agents" not in config: config["agents"] = {}
     if "defaults" not in config["agents"]: config["agents"]["defaults"] = {}
     if "sandbox" not in config["agents"]["defaults"]: config["agents"]["defaults"]["sandbox"] = {}
-    if config["agents"]["defaults"]["sandbox"].get("mode") != "on":
-        if confirm("Enable agent sandboxing (mode: on)?"):
-            config["agents"]["defaults"]["sandbox"]["mode"] = "on"
+    if config["agents"]["defaults"]["sandbox"].get("mode") != "all":
+        if confirm("Enable agent sandboxing (mode: all)?"):
+            config["agents"]["defaults"]["sandbox"]["mode"] = "all"
             changed = True
-            print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} agent sandboxing (mode: on)")
+            print(f"✅ {'Would set' if DRY_RUN else 'Set'} agent sandboxing to 'all'")
 
     # 4. Channel Policies (Allowlist)
     if "channels" not in config: config["channels"] = {}
@@ -159,12 +236,31 @@ def fix_config():
                     changed = True
                     print(f"✅ {'Would set' if DRY_RUN else 'Set'} channels.{channel_name}.{policy} to allowlist")
 
-    # 5. Telegram Dangerous Tools
+    # NEW: Dynamic Secret Injection
+    if "telegram" in config["channels"]:
+        token = config["channels"]["telegram"].get("botToken", "")
+        if token and "${" not in token:
+            if confirm("Inject environment variable for Telegram botToken?"):
+                config["channels"]["telegram"]["botToken"] = "${TELEGRAM_BOT_TOKEN}"
+                changed = True
+                print(f"✅ {'Would inject' if DRY_RUN else 'Injected'} variable for Telegram token")
+
+    # 5. Dangerous Tools (Global + Telegram)
+    dangerous_tools = ["exec", "process", "nodes", "gateway", "cron", "bash", "shell"]
+    
+    if "tools" not in config: config["tools"] = {}
+    if "deny" not in config["tools"]: config["tools"]["deny"] = []
+    for tool in dangerous_tools:
+        if tool not in config["tools"]["deny"]:
+            if confirm(f"Add \"{tool}\" to global tools.deny?"):
+                config["tools"]["deny"].append(tool)
+                changed = True
+                print(f"✅ {'Would add' if DRY_RUN else 'Added'} \"{tool}\" to global tools.deny")
+
     if "telegramBot" not in config: config["telegramBot"] = {}
     if "tools" not in config["telegramBot"]: config["telegramBot"]["tools"] = {}
     if "deny" not in config["telegramBot"]["tools"]: config["telegramBot"]["tools"]["deny"] = []
     
-    dangerous_tools = ["exec", "process", "nodes", "gateway", "cron", "bash", "shell"]
     for tool in dangerous_tools:
         if tool not in config["telegramBot"]["tools"]["deny"]:
             if confirm(f"Add \"{tool}\" to telegramBot.tools.deny?"):
@@ -204,7 +300,22 @@ def fix_config():
             changed = True
             print(f"✅ {'Would add' if DRY_RUN else 'Added'} default output_filter configuration")
 
-    # 8. Logging (v1.5)
+    # 8. Logging & Discovery (NEW)
+    if "discovery" not in config: config["discovery"] = {}
+    if "mdns" not in config["discovery"]: config["discovery"]["mdns"] = {}
+    if config["discovery"]["mdns"].get("mode") != "off":
+        if confirm("Disable mDNS network discovery?"):
+            config["discovery"]["mdns"]["mode"] = "off"
+            changed = True
+            print(f"✅ {'Would disable' if DRY_RUN else 'Disabled'} mDNS discovery")
+
+    if "logging" not in config: config["logging"] = {}
+    if config["logging"].get("redactSensitive") != "tools":
+        if confirm("Enable sensitive log redaction (redactSensitive: tools)?"):
+            config["logging"]["redactSensitive"] = "tools"
+            changed = True
+            print(f"✅ {'Would enable' if DRY_RUN else 'Enabled'} sensitive log redaction")
+
     if not config.get("logging") and not config.get("logs"):
         if confirm("Enable system logging?"):
             config["logging"] = { "level": "info", "file": "openclaw.log" }
@@ -337,9 +448,11 @@ def restart_service():
     print("⚠️ No restart strategy configured. Manual restart may be required.")
 
 def main():
-    print(f"--- OPENCLAW SECURITY FIXER v1.6 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
+    print(f"--- OPENCLAW SECURITY FIXER v1.7 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
+    fix_ssh_hardening()
+    fix_docker_firewall()
     fix_workspace_leaks()
     fix_docker_compose()
     

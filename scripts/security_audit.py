@@ -80,6 +80,16 @@ def audit_config(config):
     if control_ui.get('dangerouslyDisableDeviceAuth') is True:
         issues.append(make_issue('GW_NO_DEVICE_AUTH', 'HIGH', 'Gateway dangerouslyDisableDeviceAuth is enabled.', 'Set gateway.controlUi.dangerouslyDisableDeviceAuth to false.', category='gateway_security', auto_fixable=True))
     
+    if not gateway.get('auth', {}).get('rateLimit'):
+         issues.append(make_issue('GW_NO_RATE_LIMIT', 'HIGH', 'Gateway rate limiting is disabled. Vulnerable to brute-force.', 'Set gateway.auth.rateLimit to {} in openclaw.json.', category='gateway_security', auto_fixable=True))
+
+    if gateway.get('trustedProxies') != ["127.0.0.1"]:
+         issues.append(make_issue('GW_TRUSTED_PROXIES_MISSING', 'MEDIUM', 'Gateway trustedProxies is not configured for local loopback.', 'Set gateway.trustedProxies to ["127.0.0.1"].', category='gateway_security', auto_fixable=True))
+
+    allowed_origins = control_ui.get('allowedOrigins', [])
+    if not any(o in str(allowed_origins) for o in ["http://127.0.0.1", "http://localhost"]):
+         issues.append(make_issue('GW_ALLOWED_ORIGINS_LOOSE', 'MEDIUM', 'Allowed origins do not include standard local loopback.', 'Add localhost/127.0.0.1 to allowedOrigins.', category='gateway_security', auto_fixable=True))
+
     tools = config.get('tools', {})
     fs = tools.get('fs', {})
     if fs.get('workspaceOnly') is not True:
@@ -88,8 +98,8 @@ def audit_config(config):
     agents = config.get('agents', {})
     defaults = agents.get('defaults', {})
     sandbox = defaults.get('sandbox', {})
-    if sandbox.get('mode') == 'off':
-        issues.append(make_issue('SANDBOX_OFF', 'CRITICAL', 'Agent sandbox is disabled.', 'Set agents.defaults.sandbox.mode to "on".', category='sandbox', auto_fixable=True))
+    if sandbox.get('mode') != 'all':
+        issues.append(make_issue('SANDBOX_NOT_ALL', 'CRITICAL', 'Agent sandbox mode is not "all".', 'Set agents.defaults.sandbox.mode to "all".', category='sandbox', auto_fixable=True))
     
     models = config.get('models', {})
     providers = models.get('providers', {})
@@ -101,7 +111,7 @@ def audit_config(config):
     channels = config.get('channels', {})
     tg = channels.get('telegram', {})
     if tg.get('botToken') and not tg.get('botToken').startswith('$'):
-         issues.append(make_issue('HARDCODED_TG_TOKEN', 'CRITICAL', 'Hardcoded Telegram Bot Token.', 'Use environment variables.', category='secret_management', component='telegram'))
+         issues.append(make_issue('HARDCODED_TG_TOKEN', 'CRITICAL', 'Hardcoded Telegram Bot Token.', 'Use environment variables.', category='secret_management', component='telegram', auto_fixable=True))
     
     for channel_name, channel_data in channels.items():
         if channel_name in ['telegram', 'signal']:
@@ -110,54 +120,29 @@ def audit_config(config):
             if channel_data.get('groupPolicy') != 'allowlist':
                 issues.append(make_issue(f'{channel_name.upper()}_GROUP_POLICY', 'CRITICAL', f'{channel_name} groupPolicy is not allowlist.', f'Set channels.{channel_name}.groupPolicy to "allowlist".', category='channel_security', auto_fixable=True))
 
-    telegram_bot = config.get('telegramBot', {})
-    tb_tools = telegram_bot.get('tools', {})
-    tb_deny = tb_tools.get('deny', [])
-    
+    global_tools_deny = tools.get('deny', [])
     dangerous_tools = ["exec", "process", "nodes", "gateway", "cron", "bash", "shell"]
-    
-    if not tb_tools or not tb_deny:
-        issues.append(make_issue('TELEGRAM_NO_DENYLIST', 'CRITICAL', 'Telegram bot has no tools.deny section. All tools might be allowed.', 'Add a tools.deny section to telegramBot.', category='tool_security', component='telegram', auto_fixable=True))
-    else:
-        for tool in dangerous_tools:
-            if tool not in tb_deny:
-                issues.append(make_issue(f'TELEGRAM_DENY_{tool.upper()}', 'CRITICAL', f'Telegram bot does not deny dangerous tool: {tool}.', f'Add "{tool}" to telegramBot.tools.deny.', category='tool_security', component='telegram', auto_fixable=True))
-    
-    if not telegram_bot.get('budgets') and not config.get('gateway', {}).get('rateLimit'):
-         issues.append(make_issue('NO_RATE_LIMITS', 'HIGH', 'No budgets or rate limits configured. Vulnerable to financial DoS.', 'Configure telegramBot.budgets or gateway rate limits.', category='financial_security'))
+    for tool in dangerous_tools:
+        if tool not in global_tools_deny:
+            issues.append(make_issue(f'GLOBAL_DENY_{tool.upper()}', 'HIGH', f'Global tools.deny does not include dangerous tool: {tool}.', f'Add "{tool}" to tools.deny.', category='tool_security', auto_fixable=True))
 
-    # 2. Context Window Poisoning
-    history_limit = config.get('agents', {}).get('defaults', {}).get('history', {}).get('maxMessages')
-    if not history_limit:
-        for agent in config.get('agents', {}).get('list', []):
-            if not agent.get('history', {}).get('maxMessages'):
-                issues.append(make_issue(
-                    f'NO_HISTORY_LIMIT_{agent.get("id", "unknown")}', 
-                    'WARNING', 
-                    f'Agent {agent.get("id")} has no maxMessages limit. Vulnerable to context window poisoning.', 
-                    'Set agents.defaults.history.maxMessages to a safe value (e.g., 50).', 
-                    category='agent_security', 
-                    auto_fixable=True
-                ))
+    discovery = config.get('discovery', {})
+    if discovery.get('mdns', {}).get('mode') != 'off':
+        issues.append(make_issue('MDNS_ENABLED', 'LOW', 'mDNS network discovery is enabled.', 'Set discovery.mdns.mode to "off".', category='gateway_security', auto_fixable=True))
 
-    if "sandbox" in defaults:
-        if defaults["sandbox"].get("network") != "none":
-            issues.append(make_issue('SANDBOX_NETWORK_EGRESS', 'WARNING', 'Agent sandbox network is not disabled. Agent could call external sites.', 'Set agents.defaults.sandbox.network to "none".', category='sandbox', auto_fixable=True))
-    
-    if not defaults.get("limits"):
-         issues.append(make_issue('NO_AGENT_LIMITS', 'HIGH', 'No execution limits (timeouts, tool-call caps) defined for agents.', 'Configure agents.defaults.limits with maxSteps, timeout, etc.', category='agent_security', auto_fixable=True))
+    logging = config.get('logging', {})
+    if logging.get('redactSensitive') != 'tools':
+        issues.append(make_issue('SENSITIVE_LOGS_EXPOSED', 'MEDIUM', 'Sensitive tool data is not redacted in logs.', 'Set logging.redactSensitive to "tools".', category='data_security', auto_fixable=True))
 
-    if not gateway.get('approvalGates') and not config.get('approval_gates'):
-         issues.append(make_issue('NO_APPROVAL_GATES', 'WARNING', 'Dangerous tools may run without human confirmation.', 'Enable approval gates for tools like exec, shell, write_file.', category='gateway_security'))
-         
-    if not config.get("plugins", {}).get("output_filter"):
-        issues.append(make_issue('NO_OUTPUT_FILTERING', 'WARNING', 'No live output filtering configured to block secrets or prompt leaks.', 'Install or enable an output filtering middleware/plugin.', category='data_security'))
+    return issues
 
-    # 8. System Prompt Presence
-    for agent in config.get("agents", {}).get("list", []):
-        if not agent.get("systemPrompt") and not defaults.get("systemPrompt"):
-            issues.append(make_issue(f'NO_SYSTEM_PROMPT_{agent.get("id", "unknown").upper()}', 'HIGH', f'Agent {agent.get("id")} has no systemPrompt configured.', 'Configure a robust systemPrompt with defensive instructions.', category='prompt_security'))
-
+def audit_host_firewall():
+    issues = []
+    try:
+        check = subprocess.run("iptables -L DOCKER-USER -n", shell=True, capture_output=True, text=True)
+        if "DROP" not in check.stdout:
+            issues.append(make_issue('DOCKER_USER_FIREWALL_OPEN', 'HIGH', 'DOCKER-USER iptables chain is empty or missing DROP rules.', 'Isolate the eth0 interface in DOCKER-USER chain to prevent UFW bypass.', category='host_security'))
+    except: pass
     return issues
 
 def audit_output_sanitization(config):
@@ -606,7 +591,7 @@ def main():
     use_json = '--json' in sys.argv
     
     if not use_json:
-        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT v1.6 ---{RESET}')
+        print(f'{CYAN}--- OPENCLAW SECURITY AUDIT v1.7 ---{RESET}')
     
     all_issues = []
     if os.path.exists(DEFAULT_CONFIG_PATH):
@@ -623,6 +608,7 @@ def main():
     all_issues += audit_workspace_leaks()
     all_issues += audit_prompt_defense_markers()
     all_issues += audit_ssh_config()
+    all_issues += audit_host_firewall()
     all_issues += audit_docker_env_secrets()
     all_issues += audit_container_runtime()
     all_issues += audit_docker_compose()

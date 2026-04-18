@@ -447,12 +447,28 @@ def restart_service():
 
     print("⚠️ No restart strategy configured. Manual restart may be required.")
 
+def fix_host_services():
+    print(f"[Fixer] {'(Dry-Run) ' if DRY_RUN else ''}Ensuring critical host services are active...")
+    services = ["ufw", "fail2ban"]
+    for svc in services:
+        if confirm(f"Ensure {svc} is enabled and started?"):
+            if not DRY_RUN:
+                try:
+                    subprocess.run(["systemctl", "enable", svc], check=True)
+                    subprocess.run(["systemctl", "start", svc], check=True)
+                    if svc == "ufw":
+                        subprocess.run("echo 'y' | ufw enable", shell=True, check=True)
+                    print(f"✅ Enabled and started {svc}")
+                except Exception as e:
+                    print(f"❌ Failed to fix {svc}: {e}")
+
 def main():
     print(f"--- OPENCLAW SECURITY FIXER v1.7 {'(DRY-RUN MODE)' if DRY_RUN else ''} ---")
     fix_permissions()
     config_changed = fix_config()
     fix_ssh_hardening()
     fix_docker_firewall()
+    fix_host_services()
     fix_workspace_leaks()
     fix_docker_compose()
     

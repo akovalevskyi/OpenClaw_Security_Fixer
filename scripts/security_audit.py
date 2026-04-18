@@ -571,6 +571,44 @@ def audit_docker_compose():
     
     return issues
 
+def audit_host_services():
+    issues = []
+    services = {
+        "fail2ban": ("FAIL2BAN_MISSING", "WARNING", "Fail2ban service is not active."),
+        "ufw": ("UFW_DISABLED", "HIGH", "UFW Firewall is not active."),
+        "crowdsec": ("CROWDSEC_MISSING", "WARNING", "CrowdSec engine is not active.")
+    }
+    for svc, (issue_id, sev, desc) in services.items():
+        try:
+            check = subprocess.run(["systemctl", "is-active", svc], capture_output=True, text=True)
+            if "active" not in check.stdout:
+                issues.append(make_issue(issue_id, sev, desc, f"Install and enable {svc} on the VPS.", category='monitoring'))
+        except: pass
+    
+    # SSH Alert Hook
+    try:
+        if not os.path.exists("/etc/ssh/sshrc") or "curl" not in open("/etc/ssh/sshrc").read():
+            issues.append(make_issue("SSH_ALERT_MISSING", "LOW", "SSH alert bot hook not found in /etc/ssh/sshrc.", "Add an SSH alert webhook script to notify on logins.", category='monitoring'))
+    except: pass
+    
+    return issues
+
+def audit_nginx_headers():
+    issues = []
+    headers = {
+        'Strict-Transport-Security': 'NGINX_HSTS_MISSING',
+        'X-Content-Type-Options': 'NGINX_XCTO_MISSING',
+        'X-Frame-Options': 'NGINX_XFO_MISSING',
+        'X-XSS-Protection': 'NGINX_XXSS_MISSING'
+    }
+    try:
+        check = subprocess.run("curl -I -s https://localhost --insecure || curl -I -s http://localhost", shell=True, capture_output=True, text=True)
+        for h, issue_id in headers.items():
+            if h not in check.stdout:
+                issues.append(make_issue(issue_id, 'MEDIUM', f'Missing Nginx security header: {h}', f'Add {h} to the Nginx configuration.', category='gateway_security', auto_fixable=True))
+    except: pass
+    return issues
+
 def dedupe_issues(issues):
     seen = set()
     deduped = []
@@ -609,6 +647,8 @@ def main():
     all_issues += audit_prompt_defense_markers()
     all_issues += audit_ssh_config()
     all_issues += audit_host_firewall()
+    all_issues += audit_host_services()
+    all_issues += audit_nginx_headers()
     all_issues += audit_docker_env_secrets()
     all_issues += audit_container_runtime()
     all_issues += audit_docker_compose()

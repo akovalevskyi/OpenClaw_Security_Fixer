@@ -46,5 +46,3 @@ While the fixer handles 95% of the hardening, a few manual steps are required fo
 2. **Initialize Encryption:** The fixer will automatically generate `/root/.backup_passphrase`. Back this up securely!
 3. **Persist Rules:** The fixer creates `docker-security-rules.service`. It will be enabled automatically.
 
----
-*Maintained by the OpenClaw Security Team.*

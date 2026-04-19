@@ -1,26 +1,24 @@
-# System Security Skill
+# OpenClaw Security Fixer Skill
 
-## Overview
-This skill provides OpenClaw agents with the ability to run system security audits and automatic fixers on their own host environment (primarily designed for Linux/VPS). It uses Python scripts (`security_audit.py` and `security_fixer.py`) to scan configurations, permissions, and potential data leaks.
+Use this skill to automatically audit and fix security vulnerabilities in OpenClaw infrastructure.
 
-## Capabilities
-- **Audit:** Analyze `openclaw.json`, workspace directories, and Docker environments for vulnerabilities.
-- **Fix:** Automatically harden permissions, apply secure config flags, and redact plaintext secrets.
+## Commands
+- **Security Checkup**: \`./openclaw-secure.sh\` - Runs interactive menu for audit and automated remediation.
 
-## Usage Instructions for the Agent
-1. **Running an Audit:**
-   Execute the audit script using the `run_shell_command` tool:
-   ```bash
-   python3 scripts/security_audit.py
-   ```
-   Analyze the JSON/Text output to identify `CRITICAL` or `HIGH` severity issues.
+## Automated Fixes:
+1. **Host Hardening**: 
+   - Lock 'ubuntu' user, remove from sudo/adm.
+   - SSH hardening (Port 2244, AllowUsers root).
+2. **Container Isolation**: 
+   - Apply PidsLimit, Memory, and CPU limits.
+   - Remove privileged mode.
+3. **Firewall Integrity**: 
+   - Apply DOCKER-USER chain isolation.
+   - Install persistent systemd firewall service.
+4. **Data Protection**: 
+   - Setup GPG-encrypted backups.
+   - Integrate rclone for offsite B2 storage.
 
-2. **Applying Fixes:**
-   If the user requests to secure the system or fix issues found in the audit, execute:
-   ```bash
-   python3 scripts/security_fixer.py
-   ```
-   **Important:** This may restart the OpenClaw Gateway. Warn the user before executing.
-
-3. **Checklist Review:**
-   Refer to `docs/openclaw_security_checklist.md` for manual Host/VPS security checks (UFW, Fail2ban, Vault) that cannot be fully automated from within the container.
+## Best Practices
+- Always run an **Audit** (Option 1) before applying **Fixes** (Option 5).
+- Ensure a backup of \`openclaw.json\` exists before live remediation.
